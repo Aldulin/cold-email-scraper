@@ -62,7 +62,7 @@ if st.session_state['loading']:
         # Reset loading state
         st.session_state['loading'] = False
 
-#if submit:
+if submit:
     if not keyword or not location:
         st.warning("Please enter both fields.")
     else:
