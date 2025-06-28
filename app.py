@@ -14,7 +14,7 @@ st.markdown("Get business leads (email, phone, website) from Google in seconds. 
 
 keyword = st.text_input("What kind of businesses are you targeting?", placeholder="e.g. dentist, gym, bakery")
 location = st.text_input("Where?", placeholder="e.g. London, New York, Berlin")
-submit = st.button("Scrape", on_click=scrape_action)
+submit = st.button("Scrape")
 
 if submit:
     if not keyword or not location:
