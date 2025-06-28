@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 
 # --- CONFIG ---
-API_URL = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/"  # Replace with your real URL
+API_URL = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/scrape"  # Replace with your real URL
 
 st.set_page_config(page_title="Cold Email Scraper", layout="centered")
 st.title("📬 Cold Email Scraper")
