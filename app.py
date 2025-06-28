@@ -33,7 +33,15 @@ if submit:
                 else:
                     df = pd.DataFrame(data)
                     st.success(f"✅ Found {len(df)} leads!")
-                    st.dataframe(df)
+                    # If 'hours' field is a list, convert it to comma-separated string
+                    if 'hours' in df.columns:
+                        df['hours'] = df['hours'].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
+
+# Show selected columns for better clarity
+                    columns_to_show = ['name', 'website', 'phone', 'email', 'address', 'rating', 'hours']
+                    available_cols = [col for col in columns_to_show if col in df.columns]
+                    st.dataframe(df[available_cols])
+
 
                     # CSV download
                     csv = df.to_csv(index=False).encode("utf-8")
