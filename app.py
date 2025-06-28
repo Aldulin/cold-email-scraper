@@ -83,6 +83,6 @@ if st.session_state['loading']:
             st.error(f"Network error: {e}")
         except Exception as e:
             st.error(f"Unexpected error: {e}")
-
-        # Reset loading state after done
-        st.session_state['loading'] = False
+        finally:
+            # Reset loading state after done
+            st.session_state['loading'] = False
