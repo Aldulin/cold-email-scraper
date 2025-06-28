@@ -22,6 +22,8 @@ if submit:
         with st.spinner("Scraping leads... hang tight!"):
             try:
                 response = requests.get(API_URL, params={"keyword": keyword, "location": location})
+                st.text("Raw response:")
+                st.text(response.text[:300])  # show first 300 chars
                 data = response.json()
 
                 if "error" in data:
