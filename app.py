@@ -1,62 +1,88 @@
 import streamlit as st
-import pandas as pd
 import requests
-import time
+import pandas as pd
 
-# --- CONFIG ---
-API_URL = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/scrape"  # Replace with your real URL
+# Replace with your actual backend API URL
+API_URL = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/scrape"
 
-st.set_page_config(page_title="Cold Email Scraper", layout="centered")
-st.title("📬 Cold Email Scraper")
-st.markdown("Get business leads (email, phone, website) from Google in seconds. Powered by AI scraping.")
+# Initialize loading state
+if 'loading' not in st.session_state:
+    st.session_state['loading'] = False
 
-# --- INPUT FORM ---
+# Input fields
+keyword = st.text_input("Keyword")
+location = st.text_input("Location")
 
-keyword = st.text_input("What kind of businesses are you targeting?", placeholder="e.g. dentist, gym, bakery")
-location = st.text_input("Where?", placeholder="e.g. London, New York, Berlin")
-submit = st.button("Scrape")
+# Define what happens when user clicks Scrape
+def scrape_action():
+    # Validate inputs before proceeding
+    if not keyword.strip():
+        st.warning("Please enter a keyword.")
+        return
+    if not location.strip():
+        st.warning("Please enter a location.")
+        return
+    # Set loading to True to trigger scraping
+    st.session_state['loading'] = True
 
-if submit:
-    if not keyword or not location:
-        st.warning("Please enter both fields.")
-    else:
-        with st.spinner("Scraping leads... hang tight!"):
-            try:
-                response = requests.get(API_URL, params={"keyword": keyword, "location": location})
-                st.text("Raw response:")
-                st.text(response.text[:300])  # show first 300 chars
-                data = response.json()
+# Scrape button - disabled when loading or inputs empty
+submit = st.button(
+    "Scrape",
+    on_click=scrape_action,
+    disabled=st.session_state['loading'] or not keyword.strip() or not location.strip()
+)
 
-                if "error" in data:
-                    st.error(f"❌ {data['error']}")
-                elif not data:
-                    st.info("No leads found. Try a broader keyword or location.")
-                else:
-                    df = pd.DataFrame(data)
-                    st.success(f"✅ Found {len(df)} leads!")
-                    # If 'hours' field is a list, convert it to comma-separated string
-                    if 'hours' in df.columns:
-                        df['hours'] = df['hours'].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
+# When loading, perform scraping
+if st.session_state['loading']:
+    with st.spinner("Scraping leads... hang tight!"):
+        try:
+            # Call backend API with user inputs
+            response = requests.get(API_URL, params={"keyword": keyword, "location": location})
 
-# Show selected columns for better clarity
-                    columns_to_show = ['name', 'website', 'phone', 'email', 'address', 'rating', 'hours']
-                    available_cols = [col for col in columns_to_show if col in df.columns]
-                    st.dataframe(df[available_cols])
+            # Handle rate limit HTTP status
+            if response.status_code == 429:
+                st.error("🚫 Rate limit exceeded. Please wait a minute before trying again.")
+                st.session_state['loading'] = False
+                st.stop()
 
+            # Raise exception for other bad statuses
+            response.raise_for_status()
+            data = response.json()
 
-                    # CSV download
-                    csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label="📥 Download leads as CSV",
-                        data=csv,
-                        file_name=f"{keyword}_{location}_leads.csv",
-                        mime="text/csv"
-                    )
+            # Handle error message from backend
+            if "error" in data:
+                st.error(f"❌ {data['error']}")
+            # Handle empty results
+            elif not data:
+                st.info("No leads found. Try a broader keyword or location.")
+            else:
+                # Convert results to dataframe
+                df = pd.DataFrame(data)
 
-            except Exception as e:
-                st.error(f"Something went wrong: {e}")
+                # Format 'hours' column if exists and is list
+                if 'hours' in df.columns:
+                    df['hours'] = df['hours'].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
 
+                # Columns to display
+                columns_to_show = ['name', 'website', 'phone', 'email', 'address', 'rating', 'hours']
+                available_cols = [col for col in columns_to_show if col in df.columns]
 
+                # Show results table
+                st.dataframe(df[available_cols])
 
-st.markdown("---")
-st.markdown("🔒 Want unlimited access + 5 more tools? [Unlock the full SaaS bundle →](https://yourbundle.gumroad.com)")
+                # Provide CSV download button
+                csv = df.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="📥 Download leads as CSV",
+                    data=csv,
+                    file_name=f"{keyword}_{location}_leads.csv",
+                    mime="text/csv"
+                )
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"Network error: {e}")
+        except Exception as e:
+            st.error(f"Unexpected error: {e}")
+
+        # Reset loading state after done
+        st.session_state['loading'] = False
