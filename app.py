@@ -67,11 +67,11 @@ def scrape_action():
             st.divider()
 
 # Scrape button - disabled when loading or inputs empty
-   # submit = st.button(
-    #    "Scrape",
-     #   on_click=scrape_action,
-     #   disabled=st.session_state['loading'] or not keyword.strip() or not location.strip()
-      #   )
+    submit = st.button(
+       "Scrape",
+        on_click=scrape_action,
+        disabled=st.session_state['loading'] or not keyword.strip() or not location.strip()
+         )
 
 # When loading, perform scraping
     if st.session_state['loading']:
