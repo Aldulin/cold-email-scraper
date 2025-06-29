@@ -5,6 +5,9 @@ import pandas as pd
 # Replace with your actual backend API URL
 API_URL = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/scrape"
 
+st.title("🚀 Cold Lead Scraper & Email Extractor")
+st.caption("Find local business leads with emails in seconds. Export to CSV. Powered by Google + AI.")
+
 # Initialize loading state
 if 'loading' not in st.session_state:
     st.session_state['loading'] = False
