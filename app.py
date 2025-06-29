@@ -95,7 +95,7 @@ def scrape_action():
                     st.error(f"❌ {data['error']}")
             # Handle empty results
                 elif not data:
-                st.info("No leads found. Try a broader keyword or location.")
+                    st.info("No leads found. Try a broader keyword or location.")
                 else:
                 # Convert results to dataframe
                     df = pd.DataFrame(data)
