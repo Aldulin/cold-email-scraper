@@ -10,11 +10,13 @@ API_URL = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.rep
 if 'loading' not in st.session_state:
     st.session_state['loading'] = False
 
+st.title("🚀 Cold Lead Scraper & Email Extractor")
+st.caption("Find local business leads with emails in seconds. Export to CSV. Powered by Google + AI.")
+
 # Input fields
 keyword = st.text_input("Keyword")
 location = st.text_input("Location")
-st.title("🚀 Cold Lead Scraper & Email Extractor")
-st.caption("Find local business leads with emails in seconds. Export to CSV. Powered by Google + AI.")
+
 
 # Define what happens when user clicks Scrape
 def scrape_action():
