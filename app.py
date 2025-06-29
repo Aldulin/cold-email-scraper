@@ -41,6 +41,8 @@ if st.button("🔍 Scrape Leads"):
                 headers = {"X-DEV-KEY": "letmein"}
                 response = requests.post(api_url, json={"keyword": keyword, "location": location}, headers=headers)
 
+                if response.status_code == 429:
+                    st.warning(response.json().get("error", "Rate limit reached."))
                 if response.status_code != 200:
                     st.error(f"❌ API Error: {response.status_code}")
                 else:
