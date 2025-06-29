@@ -74,65 +74,65 @@ def scrape_action():
       #   )
 
 # When loading, perform scraping
-if st.session_state['loading']:
-    with st.spinner("Scraping leads... hang tight!"):
-        try:
+    if st.session_state['loading']:
+        with st.spinner("Scraping leads... hang tight!"):
+            try:
             # Call backend API with user inputs
-            response = requests.get(API_URL, params={"keyword": keyword, "location": location})
+                response = requests.get(API_URL, params={"keyword": keyword, "location": location})
 
             # Handle rate limit HTTP status
-            if response.status_code == 429:
-                st.error("🚫 Rate limit exceeded. Please wait a minute before trying again.")
-                st.session_state['loading'] = False
-                st.stop()
+                if response.status_code == 429:
+                    st.error("🚫 Rate limit exceeded. Please wait a minute before trying again.")
+                    st.session_state['loading'] = False
+                    st.stop()
 
             # Raise exception for other bad statuses
-            response.raise_for_status()
-            data = response.json()
+                response.raise_for_status()
+                data = response.json()
 
             # Handle error message from backend
-            if "error" in data:
-                st.error(f"❌ {data['error']}")
+                if "error" in data:
+                    st.error(f"❌ {data['error']}")
             # Handle empty results
-            elif not data:
+                elif not data:
                 st.info("No leads found. Try a broader keyword or location.")
-            else:
+                else:
                 # Convert results to dataframe
-                df = pd.DataFrame(data)
+                    df = pd.DataFrame(data)
 
                 # Format 'hours' column if exists and is list
-                if 'hours' in df.columns:
-                    df['hours'] = df['hours'].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
+                    if 'hours' in df.columns:
+                        df['hours'] = df['hours'].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
 
                 # Columns to display
-                columns_to_show = ['name', 'website', 'phone', 'email', 'address', 'rating', 'hours']
-                available_cols = [col for col in columns_to_show if col in df.columns]
+                    columns_to_show = ['name', 'website', 'phone', 'email', 'address', 'rating', 'hours']
+                    available_cols = [col for col in columns_to_show if col in df.columns]
 
                 # Show results table
-                st.dataframe(df[available_cols])
+                    st.dataframe(df[available_cols])
 
                 # Provide CSV download button
-                csv = df.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label="📥 Download leads as CSV",
-                    data=csv,
-                    file_name=f"{keyword}_{location}_leads.csv",
-                    mime="text/csv"
-                )
+                    csv = df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        label="📥 Download leads as CSV",
+                        data=csv,
+                        file_name=f"{keyword}_{location}_leads.csv",
+                        mime="text/csv"
+                    )
         
-        except requests.exceptions.RequestException as e:
-            st.error(f"Network error: {e}")
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-        finally:
+            except requests.exceptions.RequestException as e:
+                st.error(f"Network error: {e}")
+            except Exception as e:
+                st.error(f"Unexpected error: {e}")
+            finally:
             # Reset loading state after done
-            st.session_state['loading'] = False
+                st.session_state['loading'] = False
 
-if leads:
-    df = pd.DataFrame(leads)
-    csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False)
-    st.download_button("📥 Download Leads as CSV", csv_buffer.getvalue(), "leads.csv", mime="text/csv")
+    if leads:
+        df = pd.DataFrame(leads)
+        csv_buffer = StringIO()
+        df.to_csv(csv_buffer, index=False)
+        st.download_button("📥 Download Leads as CSV", csv_buffer.getvalue(), "leads.csv", mime="text/csv")
 
 st.markdown("---")
 st.markdown("🔓 Need more scrapes? [Upgrade to full version on Gumroad →](https://yourgumroadlink.com)", unsafe_allow_html=True)
