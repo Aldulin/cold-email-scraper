@@ -72,12 +72,11 @@ if leads:
         st.markdown(f"### 🏢 {biz.get('name', 'Unknown')}")
         st.write(f"📍 {biz.get('address', 'No address provided')}")
 
-        if biz.get("email"):
-            st.code(biz["email"])
-            for i, biz in enumerate(leads):
-        	    email = biz.get("email", "")
-                if email:
-                    st.button("📋 Copy Email", key=f"copy-{email}-{i}")
+
+        for i, biz in enumerate(leads):
+        	email = biz.get("email", "")
+            if email:
+                 st.button("📋 Copy Email", key=f"copy-{email}-{i}")
 
         else:
             st.text("❌ No email found.")
