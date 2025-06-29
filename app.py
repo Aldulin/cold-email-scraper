@@ -54,6 +54,20 @@ if st.button("🔍 Scrape Leads"):
 # ----------------- SHOW RESULTS -----------------
 if leads:
     st.success(f"✅ {len(leads)} leads found!")
+     # Prepare CSV
+    df = pd.DataFrame(leads)
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer, index=False)
+
+    # Stylish CSV download button
+    st.download_button(
+        label="📥 Download All Leads as CSV",
+        data=csv_buffer.getvalue(),
+        file_name="leads.csv",
+        mime="text/csv"
+    )
+
+    st.markdown("---")  # Optional divider
     for biz in leads:
         st.markdown(f"### 🏢 {biz.get('name', 'Unknown')}")
         st.write(f"📍 {biz.get('address', 'No address provided')}")
@@ -66,11 +80,7 @@ if leads:
 
         st.divider()
 
-    # --------------- CSV DOWNLOAD ---------------
-    df = pd.DataFrame(leads)
-    csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False)
-    st.download_button("📥 Download Leads as CSV", csv_buffer.getvalue(), "leads.csv", mime="text/csv")
+  
 
 # ----------------- UPGRADE CTA -----------------
 st.markdown("---")
