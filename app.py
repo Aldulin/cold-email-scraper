@@ -37,7 +37,7 @@ if st.button("🔍 Scrape Leads"):
 
             try:
                 # Replace this with your actual API URL
-                api_url = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/"
+                api_url = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/scrape"
                 response = requests.post(api_url, json={"keyword": keyword, "location": location})
 
                 if response.status_code != 200:
