@@ -40,12 +40,12 @@ def scrape_action():
     st.session_state['loading'] = True
     
     MAX_FREE_SCRAPES = 3
-if "free_uses" not in st.session_state:
-    st.session_state["free_uses"] = 0
+    if "free_uses" not in st.session_state:
+        st.session_state["free_uses"] = 0
 
-if st.session_state["free_uses"] >= MAX_FREE_SCRAPES:
-    st.warning("🚫 Free tier limit reached (3 scrapes/day). [Upgrade to unlock unlimited access](https://yourgumroadlink.com)")
-    st.stop()
+    if st.session_state["free_uses"] >= MAX_FREE_SCRAPES:
+        st.warning("🚫 Free tier limit reached (3 scrapes/day). [Upgrade to unlock unlimited access](https://yourgumroadlink.com)")
+        st.stop()
     if st.button("🔍 Scrape Leads"):
         if not keyword or not location:
             st.error("Please enter both keyword and location.")
