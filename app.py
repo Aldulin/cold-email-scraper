@@ -71,7 +71,7 @@ if st.session_state["free_uses"] >= MAX_FREE_SCRAPES:
     #    "Scrape",
      #   on_click=scrape_action,
      #   disabled=st.session_state['loading'] or not keyword.strip() or not location.strip()
-         )
+      #   )
 
 # When loading, perform scraping
 if st.session_state['loading']:
