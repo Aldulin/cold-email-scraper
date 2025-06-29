@@ -74,7 +74,11 @@ if leads:
 
         if biz.get("email"):
             st.code(biz["email"])
-            st.button("📋 Copy Email", key=f"copy-{biz['email']}")
+            for i, biz in enumerate(leads):
+        	    email = biz.get("email", "")
+                if email:
+                st.button("📋 Copy Email", key=f"copy-{email}-{i}")
+
         else:
             st.text("❌ No email found.")
 
