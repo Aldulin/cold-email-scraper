@@ -54,30 +54,26 @@ if st.button("🔍 Scrape Leads"):
 # ----------------- SHOW RESULTS -----------------
 if leads:
     st.success(f"✅ {len(leads)} leads found!")
-     # Prepare CSV
+
+    # CSV download (before the loop)
     df = pd.DataFrame(leads)
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False)
+    st.download_button("📥 Download Leads as CSV", csv_buffer.getvalue(), "leads.csv", mime="text/csv")
 
-    # Stylish CSV download button
-    st.download_button(
-        label="📥 Download All Leads as CSV",
-        data=csv_buffer.getvalue(),
-        file_name="leads.csv",
-        mime="text/csv"
-    )
+    st.markdown("---")
 
-    st.markdown("---")  # Optional divider
-    for biz in leads:
+    # Render each lead
+    for i, biz in enumerate(leads):
         st.markdown(f"### 🏢 {biz.get('name', 'Unknown')}")
         st.write(f"📍 {biz.get('address', 'No address provided')}")
-        
-        for i, biz in enumerate(leads):
-        	email = biz.get("email", "")
-            if email:
-                st.button("📋 Copy Email", key=f"copy-{email}-{i}")
-            else:
-                st.text("❌ No email found.")
+
+        email = biz.get("email")
+        if email:
+            st.code(email)
+            st.button("📋 Copy Email", key=f"copy-{email}-{i}")
+        else:
+            st.text("❌ No email found.")
 
         st.divider()
 
