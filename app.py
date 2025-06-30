@@ -76,9 +76,8 @@ if leads:
         	email = biz.get("email", "")
             if email:
                 st.button("📋 Copy Email", key=f"copy-{email}-{i}")
-
-        else:
-            st.text("❌ No email found.")
+            else:
+                st.text("❌ No email found.")
 
         st.divider()
 
