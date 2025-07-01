@@ -1,84 +1,52 @@
 import streamlit as st
 import pandas as pd
 import requests
-from io import StringIO
 
-# ----------------- CONFIG -----------------
-st.set_page_config(page_title="Cold Lead Scraper", layout="centered")
+# --- CONFIG ---
+API_URL = "https://cold-email-scraper.fly.dev/"  # Change to your backend base URL
 
-# ----------------- UI HEADER -----------------
-st.title("🚀 Cold Lead Scraper & Email Extractor")
-st.caption("Find local business leads with emails in seconds. Export to CSV. Powered by Google + AI.")
+st.set_page_config(page_title="Cold Email Scraper", layout="centered")
+st.title("📬 Cold Email Scraper")
+st.markdown("Get business leads (email, phone, website) from Google in seconds. Powered by AI scraping.")
 
-# ----------------- INPUT FIELDS -----------------
-col1, col2 = st.columns([3, 1])
-with col1:
-    keyword = st.text_input("🔍 Business Type (e.g. plumber, dentist)", key="keyword")
-with col2:
-    location = st.text_input("📍 Location", key="location", value="Berlin")
+# --- INPUT FORM ---
+with st.form("scrape_form"):
+    keyword = st.text_input("What kind of businesses are you targeting?", placeholder="e.g. dentist, gym, bakery")
+    location = st.text_input("Where?", placeholder="e.g. London, New York, Berlin")
+    submit = st.form_submit_button("🔍 Scrape")
 
-# ----------------- FREE TIER LIMIT -----------------
-MAX_FREE_SCRAPES = 3
-if "free_uses" not in st.session_state:
-    st.session_state["free_uses"] = 0
-
-if st.session_state["free_uses"] >= MAX_FREE_SCRAPES:
-    st.warning("🚫 Free tier limit reached (3 scrapes/day). [Upgrade to unlock unlimited access](https://yourgumroadlink.com)")
-    st.stop()
-
-# ----------------- SCRAPE BUTTON -----------------
-leads = []
-if st.button("🔍 Scrape Leads"):
+if submit:
     if not keyword or not location:
-        st.error("Please enter both keyword and location.")
+        st.warning("Please enter both fields.")
     else:
-        st.session_state["free_uses"] += 1
-        with st.spinner("Scraping leads..."):
-
+        with st.spinner("Scraping leads... hang tight!"):
             try:
-                # Replace this with your actual API URL
-                api_url = "https://74ea2c7f-2dfc-49b4-8aaf-8d4601db8782-00-nzsmwrqnnxdb.worf.replit.dev/scrape"
-                headers = {"X-DEV-KEY": "letmein"}
-                response = requests.post(api_url, json={"keyword": keyword, "location": location}, headers=headers)
+                response = requests.post(
+                    API_URL + "scrape",
+                    json={"keyword": keyword, "location": location}
+                )
+                data = response.json()
 
-                if response.status_code == 429:
-                    st.warning(response.json().get("error", "Rate limit reached."))
-                if response.status_code != 200:
-                    st.error(f"❌ API Error: {response.status_code}")
+                if "error" in data:
+                    st.error(f"❌ {data['error']}")
+                elif not data:
+                    st.info("No leads found. Try a broader keyword or location.")
                 else:
-                    leads = response.json()
+                    df = pd.DataFrame(data)
+                    st.success(f"✅ Found {len(df)} leads!")
+                    st.dataframe(df)
+
+                    # CSV download
+                    csv = df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        label="📥 Download leads as CSV",
+                        data=csv,
+                        file_name=f"{keyword}_{location}_leads.csv",
+                        mime="text/csv"
+                    )
 
             except Exception as e:
-                st.error(f"Something went wrong: {str(e)}")
+                st.error(f"Something went wrong: {e}")
 
-# ----------------- SHOW RESULTS -----------------
-if leads:
-    st.success(f"✅ {len(leads)} leads found!")
-
-    # CSV download (before the loop)
-    df = pd.DataFrame(leads)
-    csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False)
-    st.download_button("📥 Download Leads as CSV", csv_buffer.getvalue(), "leads.csv", mime="text/csv")
-
-    st.markdown("---")
-
-    # Render each lead
-    for i, biz in enumerate(leads):
-        st.markdown(f"### 🏢 {biz.get('name', 'Unknown')}")
-        st.write(f"📍 {biz.get('address', 'No address provided')}")
-
-        email = biz.get("email")
-        if email:
-            st.code(email)
-            st.button("📋 Copy Email", key=f"copy-{email}-{i}")
-        else:
-            st.text("❌ No email found.")
-
-        st.divider()
-
-  
-
-# ----------------- UPGRADE CTA -----------------
 st.markdown("---")
-st.markdown("🔓 Need more scrapes? [Upgrade to full version on Gumroad →](https://yourgumroadlink.com)", unsafe_allow_html=True)
+st.markdown("🔒 Want unlimited access + 5 more tools? [Unlock the full SaaS bundle →](https://yourbundle.gumroad.com)")
