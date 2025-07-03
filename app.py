@@ -34,6 +34,8 @@ if submit:
                 else:
                     df = pd.DataFrame(data)
                     st.success(f"✅ Found {len(df)} leads!")
+                    df = df[["name", "email", "phone", "website", "address", "rating", "hours"]]
+                    df = df.rename(columns=str.title)  # Optional: Make column names pretty
                     st.dataframe(df)
 
                     # CSV download
