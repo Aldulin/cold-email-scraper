@@ -5,9 +5,9 @@ import requests
 # --- CONFIG ---
 API_URL = "https://cold-email-scraper.fly.dev/"  # Change to your backend base URL
 
-st.set_page_config(page_title="Cold Email Scraper", layout="centered")
+st.set_page_config(layout="wide", page_title="Cold Email Scraper", page_icon="📬")
 st.title("📬 Cold Email Scraper")
-st.markdown("Get business leads (email, phone, website) from Google in seconds. Powered by AI scraping.")
+st.write("Get business leads (email, phone, website) from Google in seconds. Powered by AI scraping.")
 
 # --- INPUT FORM ---
 with st.form("scrape_form"):
@@ -50,5 +50,5 @@ if submit:
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
 
-st.markdown("---")
-st.markdown("🔒 Want unlimited access + 5 more tools? [Unlock the full SaaS bundle →](https://yourbundle.gumroad.com)")
+st.write("---")
+st.write("🔒 Want unlimited access + 5 more tools? [Unlock the full SaaS bundle →](https://yourbundle.gumroad.com)")
