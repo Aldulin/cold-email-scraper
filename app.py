@@ -2,61 +2,57 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# --- CONFIG ---
 API_URL = "https://cold-email-scraper.fly.dev/"  # Your backend URL
 
 st.set_page_config(layout="wide", page_title="Cold Email Scraper", page_icon="📬")
-
-st.markdown("""
-    <style>
-    @media only screen and (max-width: 768px) {
-        .block-container { padding: 1rem; }
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("📬 Cold Email Scraper")
-st.caption("Get emails, phones, and websites from local businesses — ready to cold email!")
+st.caption("Find verified business leads (emails, phones, websites) from Google Places — export as CSV.")
 
-# --- INPUT FORM ---
+# --- Input Form ---
 with st.form("scrape_form"):
     col1, col2 = st.columns(2)
     with col1:
-        keyword = st.text_input("🔍 Business type", placeholder="e.g. dentist, gym, bakery")
+        keyword = st.text_input("🔍 Business type", placeholder="e.g. dentist, gym")
     with col2:
-        location = st.text_input("📍 Location", placeholder="e.g. Berlin, London")
+        location = st.text_input("📍 Location", placeholder="e.g. London, Berlin")
     
-    count = st.slider("How many results?", 5, 30, 15, step=5)
+    count = st.slider("How many results?", min_value=5, max_value=30, value=15, step=5)
     submit = st.form_submit_button("🚀 Scrape Leads")
 
-# --- LOGIC ---
+# --- Scrape Logic ---
 if submit:
     if not keyword or not location:
-        st.warning("Please enter both fields.")
+        st.warning("Please enter both keyword and location.")
     else:
-        with st.spinner("Scraping leads... hang tight!"):
+        with st.spinner("Scraping... hang tight!"):
             try:
                 response = requests.post(
                     API_URL + "scrape",
                     json={"keyword": keyword, "location": location, "count": count},
-                    timeout=25
+                    timeout=30
                 )
                 data = response.json()
 
                 if "error" in data:
                     st.error(f"❌ {data['error']}")
                 elif not data:
-                    st.info("No leads found. Try a broader search.")
+                    st.info("No leads found. Try another keyword/location.")
                 else:
                     df = pd.DataFrame(data)
+                    df = df[df["email"].notna() | df["phone"].notna()]
                     df = df[["name", "email", "phone", "website", "address", "rating", "hours"]]
-                    df = df.rename(columns=str.title)
+                    df.columns = [col.title() for col in df.columns]
 
-                    emails_found = df["Email"].notna().sum()
-                    st.success(f"✅ Found {len(df)} leads ({emails_found} with email)")
+                    st.success(f"✅ Found {len(df)} leads ({df['Email'].notna().sum()} with email)")
 
+                    # CSV
                     csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button("📥 Download CSV", data=csv, file_name=f"{keyword}_{location}_leads.csv", mime="text/csv")
+                    st.download_button(
+                        "📥 Download as CSV",
+                        data=csv,
+                        file_name=f"{keyword}_{location}_leads.csv",
+                        mime="text/csv"
+                    )
 
                     st.dataframe(df, use_container_width=True)
 
@@ -64,4 +60,4 @@ if submit:
                 st.error(f"Something went wrong: {e}")
 
 st.markdown("---")
-st.markdown("🔓 [Unlock unlimited access & bonus tools →](https://yourbundle.gumroad.com)")
+st.markdown("🔒 Want full access + bonus tools? [Get the SaaS bundle →](https://yourbundle.gumroad.com)")
