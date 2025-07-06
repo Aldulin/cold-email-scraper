@@ -101,7 +101,7 @@ if submit:
                 headers=headers,
                 timeout=90  # Extended timeout
             )
-            
+            print("Response content:", response.text[:500])  # Debugging line
             # Handle response content
             try:
                 response_data = response.json()
