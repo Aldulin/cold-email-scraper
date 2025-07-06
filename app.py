@@ -32,9 +32,10 @@ with st.sidebar:
     st.caption(f"**Session ID:** `{st.session_state.session_id[:8]}`")
     
     # Show usage stats
-    daily_remaining = max(0, st.session_state.available_searches - st.session_state.usage['daily'])
+    daily_used = st.session_state.usage['daily']
+    daily_remaining = max(0, st.session_state.available_searches - daily_used)
     st.metric("🔍 Daily Searches", 
-              f"{st.session_state.usage['daily']}/{st.session_state.available_searches}",
+              f"{daily_used}/{st.session_state.available_searches}",
               f"{daily_remaining} remaining")
     
     st.metric("🗓️ Monthly Searches", 
@@ -73,75 +74,82 @@ if submit:
         progress_bar = st.progress(0)
         status_text = st.empty()
         try:
-            headers = {"X-Referral-Code": st.session_state.referral_code}
+            headers = {
+                "X-Referral-Code": st.session_state.referral_code or "",
+                "Content-Type": "application/json"
+            }
             payload = {
                 "keyword": keyword, 
                 "location": location, 
                 "count": min(count, 15)  # Free tier limit
             }
+            
+            # Show progress
             status_text.info("🚀 Starting search...")
             progress_bar.progress(10)
-
-            # Show progress updates
-            for i in range(3):
-                status_text.info(f"🔍 Searching {keyword} in {location}...")
-                progress_bar.progress(20 + i*10)
-                time.sleep(0.5)
             
-
+            # Make API request
             response = requests.post(
-                f"{API_URL}/scrape",
+                f"{API_URL}scrape",
                 json=payload,
                 headers=headers,
                 timeout=60
             )
-                
+            
             if response.status_code == 429:
                 error_data = response.json()
                 st.error(f"❌ {error_data['error']}: {error_data['used']}/{error_data['limit']} searches used")
                 st.info(f"**Pro Tip:** {error_data.get('referral_bonus', 'Invite friends for bonus searches')}")
             elif response.status_code != 200:
                 error_data = response.json()
-                # Show detailed error
                 st.error(f"❌ Backend Error: {error_data.get('error', 'Unknown error')}")
                 if "details" in error_data:
                     with st.expander("Technical Details"):
                         st.code(error_data["details"])
             else:
                 data = response.json()
-                st.success(f"✅ Found {len(data['results'])} leads in {data['stats']['time']:.1f}s")
                 st.session_state.usage = {
                     'daily': data['usage']['daily'],
                     'monthly': data['usage']['monthly'],
                     'referrals': data['usage']['referrals']
                 }
                 st.session_state.available_searches = FREE_DAILY_SEARCHES + (
-                st.session_state.usage['referrals'] * REFERRAL_BONUS
+                    st.session_state.usage['referrals'] * REFERRAL_BONUS
                 )
-                st.success(f"✅ Found {len(data['results'])} leads in {data['stats']['time']:.1f}s")    
+                
+                # Process results
                 df = pd.DataFrame(data['results'])
                 if not df.empty:
-                    # Process results
-                    df = df[df["email"].notna() | df["phone"].notna()]
+                    # Filter and rename columns
                     df = df[["name", "email", "phone", "website", "address"]]
                     df.columns = [col.title() for col in df.columns]
+                    
+                    # Filter out rows without contact info
+                    df = df[df['Email'].notna() | df['Phone'].notna()]
+                    
+                    if not df.empty:
+                        # Show results
+                        email_count = df['Email'].notna().sum()
+                        st.success(f"✅ Found {len(df)} leads ({email_count} with email) in {data['stats']['time']:.1f}s")
                         
-                    # Show results
-                    email_count = df['Email'].notna().sum()
-                    st.success(f"✅ Found {len(df)} leads ({email_count} with email)")
+                        # CSV Export
+                        csv = df.to_csv(index=False).encode("utf-8")
+                        st.download_button(
+                            "📥 Download CSV", 
+                            csv,
+                            file_name=f"{keyword}_{location}_leads.csv",
+                            mime="text/csv"
+                        )
                         
-                    # CSV Export
-                    csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        "📥 Download CSV", 
-                        csv,
-                        file_name=f"{keyword}_{location}_leads.csv",
-                        mime="text/csv"
-                    )
-                        
-                    st.dataframe(df, use_container_width=True)
+                        st.dataframe(df, use_container_width=True)
+                    else:
+                        st.info("No valid leads found. Try different parameters")
                 else:
-                    st.info("No valid leads found. Try different parameters")
+                    st.info("No results found. Try different search terms")
+                    
+            progress_bar.progress(100)
+            time.sleep(0.5)
+            
         except requests.exceptions.Timeout:
             st.error("⌛ Request timed out. Try fewer results or try again later.")
         except Exception as e:
@@ -170,7 +178,7 @@ with c3:
     st.write("API access")
     st.write("Dedicated support")
 
-if st.button("✨ Upgrade Now", type="primary"):
+if st.button("✨ Upgrade Now", type="primary", key="upgrade_button"):
     st.session_state.show_upgrade = True
 
 if st.session_state.get('show_upgrade'):
