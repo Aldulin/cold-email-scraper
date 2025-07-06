@@ -5,9 +5,10 @@ import time
 import uuid
 
 # Configuration
-API_URL = "https://cold-email-scraper.fly.dev/"  # Update with your Fly.io URL
+API_URL = "https://cold-email-scraper.fly.dev/"  # Update with your backend URL
 FREE_DAILY_SEARCHES = 3
 REFERRAL_BONUS = 2
+PROGRESS_STEPS = 5  # Number of progress steps
 
 # Initialize session state
 if 'session_id' not in st.session_state:
@@ -47,7 +48,7 @@ with st.sidebar:
     
     # Referral link
     st.divider()
-    referral_link = f"https://your-streamlit-app.com?referral_code={st.session_state.session_id}"
+    referral_link = f"https://your-app.com?referral_code={st.session_state.session_id}"
     st.caption("Invite friends and get bonus searches:")
     st.code(referral_link)
     if st.button("📋 Copy Referral Link"):
@@ -62,8 +63,8 @@ with st.form("scrape_form"):
     with col2:
         location = st.text_input("📍 Location", placeholder="e.g. London, Berlin", key="loc")
     
-    count = st.slider("Results to fetch", 5, 30, 15, 5,
-                      help="Free users limited to 15 results per search")
+    count = st.slider("Results to fetch", 5, 30, 10, 5,
+                      help="Free users limited to 10 results per search")
     submit = st.form_submit_button("🚀 Scrape Leads")
 
 # --- Scrape Logic ---
@@ -73,6 +74,8 @@ if submit:
     else:
         progress_bar = st.progress(0)
         status_text = st.empty()
+        result_container = st.empty()
+        
         try:
             headers = {
                 "X-Referral-Code": st.session_state.referral_code or "",
@@ -81,19 +84,21 @@ if submit:
             payload = {
                 "keyword": keyword, 
                 "location": location, 
-                "count": min(count, 15)  # Free tier limit
+                "count": min(count, 10)  # Free tier limit
             }
             
             # Show progress
-            status_text.info("🚀 Starting search...")
-            progress_bar.progress(10)
+            for i in range(PROGRESS_STEPS):
+                status_text.info(f"🔍 Step {i+1}/{PROGRESS_STEPS}: Processing...")
+                progress_bar.progress((i+1) * (100 // PROGRESS_STEPS))
+                time.sleep(0.3)
             
             # Make API request
             response = requests.post(
                 f"{API_URL}scrape",
                 json=payload,
                 headers=headers,
-                timeout=60
+                timeout=90  # Extended timeout
             )
             
             if response.status_code == 429:
@@ -130,7 +135,7 @@ if submit:
                     if not df.empty:
                         # Show results
                         email_count = df['Email'].notna().sum()
-                        st.success(f"✅ Found {len(df)} leads ({email_count} with email) in {data['stats']['time']:.1f}s")
+                        result_container.success(f"✅ Found {len(df)} leads ({email_count} with email) in {data['stats']['time']:.1f}s")
                         
                         # CSV Export
                         csv = df.to_csv(index=False).encode("utf-8")
@@ -143,18 +148,18 @@ if submit:
                         
                         st.dataframe(df, use_container_width=True)
                     else:
-                        st.info("No valid leads found. Try different parameters")
+                        result_container.info("No valid leads found. Try different parameters")
                 else:
-                    st.info("No results found. Try different search terms")
+                    result_container.info("No results found. Try different search terms")
                     
+        except requests.exceptions.Timeout:
+            result_container.error("⌛ Request timed out. Try fewer results.")
+        except Exception as e:
+            result_container.error(f"🔥 Unexpected error: {str(e)}")
+        finally:
+            time.sleep(0.5)
             progress_bar.progress(100)
             time.sleep(0.5)
-            
-        except requests.exceptions.Timeout:
-            st.error("⌛ Request timed out. Try fewer results or try again later.")
-        except Exception as e:
-            st.error(f"🔥 Unexpected error: {str(e)}")
-        finally:
             progress_bar.empty()
             status_text.empty()
 
@@ -163,35 +168,29 @@ st.divider()
 st.subheader("🚀 Ready for Unlimited Access?")
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.write("**Free Tier**")
-    st.write("3 searches/day")
-    st.write("10 searches/month")
-    st.write("Basic results")
+    st.markdown("**Free Tier**")
+    st.markdown("- 3 searches/day\n- 10 searches/month\n- Basic results")
 with c2:
-    st.write("**Pro Tier ($9.99)**")
-    st.write("100 searches/month")
-    st.write("Priority processing")
-    st.write("Full exports")
+    st.markdown("**Pro Tier ($9.99/month)**")
+    st.markdown("- 100 searches/month\n- Priority processing\n- Full exports")
 with c3:
-    st.write("**Unlimited ($24.99)**")
-    st.write("Unlimited searches")
-    st.write("API access")
-    st.write("Dedicated support")
+    st.markdown("**Unlimited ($24.99/month)**")
+    st.markdown("- Unlimited searches\n- API access\n- Dedicated support")
 
 if st.button("✨ Upgrade Now", type="primary", key="upgrade_button"):
     st.session_state.show_upgrade = True
 
 if st.session_state.get('show_upgrade'):
     with st.expander("💎 Premium Options", expanded=True):
-        st.write("**Special Launch Offer (First 100 customers):**")
-        st.write("- Lifetime Pro Tier: $19.99 (reg. $99)")
-        st.write("- 1 Year Unlimited: $29.99 (reg. $299)")
-        st.write("👉 [Purchase on Gumroad](https://gumroad.com/your-product)")
+        st.markdown("**Special Launch Offer (First 100 customers):**")
+        st.markdown("- Lifetime Pro Tier: $19.99 (reg. $99)")
+        st.markdown("- 1 Year Unlimited: $29.99 (reg. $299)")
+        st.markdown("👉 [Purchase on Gumroad](https://gumroad.com/your-product)")
         st.caption("After purchase, email receipt to support@yourapp.com for activation")
 
 # --- Footer ---
 st.markdown("---")
-st.caption("""
+st.markdown("""
     **Organic Growth Strategy:**  
     - Share your referral link for bonus searches  
     - Tweet about us to get 5 free bonus searches  
