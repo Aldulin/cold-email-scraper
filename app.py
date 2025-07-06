@@ -102,11 +102,26 @@ if submit:
                 timeout=90  # Extended timeout
             )
             
-            # Handle JSON parsing errors
+            # Handle response content
+            content_type = response.headers.get('Content-Type', '')
+            is_json = 'application/json' in content_type
+            
+            if not is_json:
+                result_container.error("🔥 Server returned non-JSON response")
+                with st.expander("Show response details"):
+                    st.write(f"**Status Code:** {response.status_code}")
+                    st.write(f"**Content Type:** {content_type}")
+                    st.code(response.text[:1000])
+                progress_bar.empty()
+                status_text.empty()
+                st.stop()
+            
             try:
                 response_data = response.json()
             except json.JSONDecodeError:
-                st.error(f"🔥 Invalid response from server: {response.text[:200]}")
+                result_container.error("🔥 Failed to parse JSON response")
+                with st.expander("Show response content"):
+                    st.code(response.text[:1000])
                 progress_bar.empty()
                 status_text.empty()
                 st.stop()
@@ -121,7 +136,7 @@ if submit:
                 st.error(f"❌ Backend Error: {error_data.get('error', 'Unknown error')}")
                 if "details" in error_data:
                     with st.expander("Technical Details"):
-                        st.code(error_data["details"])
+                        st.code(error_data.get("details", "No details"))
             else:
                 data = response_data
                 st.session_state.usage = {
