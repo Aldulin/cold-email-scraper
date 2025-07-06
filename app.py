@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import time
 import uuid
+import json
 
 # Configuration
 API_URL = "https://cold-email-scraper.fly.dev/"  # Update with your backend URL
@@ -101,18 +102,28 @@ if submit:
                 timeout=90  # Extended timeout
             )
             
+            # Handle JSON parsing errors
+            try:
+                response_data = response.json()
+            except json.JSONDecodeError:
+                st.error(f"🔥 Invalid response from server: {response.text[:200]}")
+                progress_bar.empty()
+                status_text.empty()
+                st.stop()
+            
             if response.status_code == 429:
-                error_data = response.json()
-                st.error(f"❌ {error_data['error']}: {error_data['used']}/{error_data['limit']} searches used")
-                st.info(f"**Pro Tip:** {error_data.get('referral_bonus', 'Invite friends for bonus searches')}")
+                error_data = response_data
+                st.error(f"❌ {error_data.get('error', 'Limit reached')}: {error_data.get('used', '?')}/{error_data.get('limit', '?')} searches used")
+                if "referral_bonus" in error_data:
+                    st.info(f"**Pro Tip:** {error_data['referral_bonus']}")
             elif response.status_code != 200:
-                error_data = response.json()
+                error_data = response_data
                 st.error(f"❌ Backend Error: {error_data.get('error', 'Unknown error')}")
                 if "details" in error_data:
                     with st.expander("Technical Details"):
                         st.code(error_data["details"])
             else:
-                data = response.json()
+                data = response_data
                 st.session_state.usage = {
                     'daily': data['usage']['daily'],
                     'monthly': data['usage']['monthly'],
@@ -123,8 +134,8 @@ if submit:
                 )
                 
                 # Process results
-                df = pd.DataFrame(data['results'])
-                if not df.empty:
+                if data.get('results'):
+                    df = pd.DataFrame(data['results'])
                     # Filter and rename columns
                     df = df[["name", "email", "phone", "website", "address"]]
                     df.columns = [col.title() for col in df.columns]
