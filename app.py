@@ -103,17 +103,11 @@ if submit:
             )
             
             # Handle response content
-            content_type = response.headers.get('Content-Type', '')
-            is_json = 'application/json' in content_type
-            
-            if not is_json:
-                result_container.error("🔥 Server returned non-JSON response")
-                with st.expander("Show response details"):
-                    st.write(f"**Status Code:** {response.status_code}")
-                    st.write(f"**Content Type:** {content_type}")
-                    st.code(response.text[:1000])
-                progress_bar.empty()
-                status_text.empty()
+            try:
+                response_data = response.json()
+            except ValueError:
+                result_container.error("🔥 Invalid response from server: Expected JSON")
+                st.code(response.text[:1000])
                 st.stop()
             
             try:
