@@ -70,64 +70,85 @@ if submit:
     if not keyword or not location:
         st.warning("Please enter both keyword and location")
     else:
-        with st.spinner(f"Scraping {count} {keyword} in {location}..."):
-            try:
-                headers = {"X-Referral-Code": st.session_state.referral_code}
-                payload = {
-                    "keyword": keyword, 
-                    "location": location, 
-                    "count": min(count, 15)  # Free tier limit
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        try:
+            headers = {"X-Referral-Code": st.session_state.referral_code}
+            payload = {
+                "keyword": keyword, 
+                "location": location, 
+                "count": min(count, 15)  # Free tier limit
+            }
+            status_text.info("🚀 Starting search...")
+            progress_bar.progress(10)
+
+            # Show progress updates
+            for i in range(3):
+                status_text.info(f"🔍 Searching {keyword} in {location}...")
+                progress_bar.progress(20 + i*10)
+                time.sleep(0.5)
+            
+
+            response = requests.post(
+                f"{API_URL}/scrape",
+                json=payload,
+                headers=headers,
+                timeout=60
+            )
+                
+            if response.status_code == 429:
+                error_data = response.json()
+                st.error(f"❌ {error_data['error']}: {error_data['used']}/{error_data['limit']} searches used")
+                st.info(f"**Pro Tip:** {error_data.get('referral_bonus', 'Invite friends for bonus searches')}")
+            elif response.status_code != 200:
+                error_data = response.json()
+                # Show detailed error
+                st.error(f"❌ Backend Error: {error_data.get('error', 'Unknown error')}")
+                if "details" in error_data:
+                    with st.expander("Technical Details"):
+                        st.code(error_data["details"])
+            else:
+                data = response.json()
+                st.success(f"✅ Found {len(data['results'])} leads in {data['stats']['time']:.1f}s")
+                st.session_state.usage = {
+                    'daily': data['usage']['daily'],
+                    'monthly': data['usage']['monthly'],
+                    'referrals': data['usage']['referrals']
                 }
-                
-                response = requests.post(
-                    f"{API_URL}/scrape",
-                    json=payload,
-                    headers=headers,
-                    timeout=120
+                st.session_state.available_searches = FREE_DAILY_SEARCHES + (
+                st.session_state.usage['referrals'] * REFERRAL_BONUS
                 )
-                
-                if response.status_code == 429:
-                    error_data = response.json()
-                    st.error(f"❌ {error_data['error']}: {error_data['used']}/{error_data['limit']} searches used")
-                    st.info(f"**Pro Tip:** {error_data.get('referral_bonus', 'Invite friends for bonus searches')}")
-                elif response.status_code != 200:
-                    st.error(f"Error: {response.text}")
-                else:
-                    data = response.json()
-                    st.session_state.usage = {
-                        'daily': data['usage']['daily'],
-                        'monthly': data['usage']['monthly'],
-                        'referrals': data['usage']['referrals']
-                    }
-                    st.session_state.available_searches = FREE_DAILY_SEARCHES + (
-                        st.session_state.usage['referrals'] * REFERRAL_BONUS
+                st.success(f"✅ Found {len(data['results'])} leads in {data['stats']['time']:.1f}s")    
+                df = pd.DataFrame(data['results'])
+                if not df.empty:
+                    # Process results
+                    df = df[df["email"].notna() | df["phone"].notna()]
+                    df = df[["name", "email", "phone", "website", "address"]]
+                    df.columns = [col.title() for col in df.columns]
+                        
+                    # Show results
+                    email_count = df['Email'].notna().sum()
+                    st.success(f"✅ Found {len(df)} leads ({email_count} with email)")
+                        
+                    # CSV Export
+                    csv = df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        "📥 Download CSV", 
+                        csv,
+                        file_name=f"{keyword}_{location}_leads.csv",
+                        mime="text/csv"
                     )
-                    
-                    df = pd.DataFrame(data['results'])
-                    if not df.empty:
-                        # Process results
-                        df = df[df["email"].notna() | df["phone"].notna()]
-                        df = df[["name", "email", "phone", "website", "address"]]
-                        df.columns = [col.title() for col in df.columns]
                         
-                        # Show results
-                        email_count = df['Email'].notna().sum()
-                        st.success(f"✅ Found {len(df)} leads ({email_count} with email)")
-                        
-                        # CSV Export
-                        csv = df.to_csv(index=False).encode("utf-8")
-                        st.download_button(
-                            "📥 Download CSV", 
-                            csv,
-                            file_name=f"{keyword}_{location}_leads.csv",
-                            mime="text/csv"
-                        )
-                        
-                        st.dataframe(df, use_container_width=True)
-                    else:
-                        st.info("No valid leads found. Try different parameters")
-            except Exception as e:
-                st.error(f"Scraping failed: {str(e)}")
+                    st.dataframe(df, use_container_width=True)
+                else:
+                    st.info("No valid leads found. Try different parameters")
+        except requests.exceptions.Timeout:
+            st.error("⌛ Request timed out. Try fewer results or try again later.")
+        except Exception as e:
+            st.error(f"🔥 Unexpected error: {str(e)}")
+        finally:
+            progress_bar.empty()
+            status_text.empty()
 
 # --- Upgrade Section ---
 st.divider()
