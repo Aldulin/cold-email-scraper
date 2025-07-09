@@ -11,6 +11,9 @@ FREE_DAILY_SEARCHES = 3
 REFERRAL_BONUS = 2
 PROGRESS_STEPS = 5  # Number of progress steps
 
+TEST_MODE = False  # Set to True for testing 
+
+
 # Initialize session state
 if 'session_id' not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
@@ -82,6 +85,10 @@ if submit:
                 "X-Referral-Code": st.session_state.referral_code or "",
                 "Content-Type": "application/json"
             }
+
+            if TEST_MODE:
+                headers["X-Test-Mode"] = "true"
+
             payload = {
                 "keyword": keyword, 
                 "location": location, 
