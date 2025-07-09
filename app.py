@@ -101,24 +101,25 @@ if submit:
                 headers=headers,
                 timeout=90  # Extended timeout
             )
+            print(f"Status Code: {response.status_code}")
             print("Response content:", response.text[:500])  # Debugging line
             # Handle response content
-            try:
-                response_data = response.json()
-            except ValueError:
-                result_container.error("🔥 Invalid response from server: Expected JSON")
-                st.code(response.text[:1000])
+            if 'application/json' in response.headers.get('Content-Type', ''):
+                try:
+                    response_data = response.json()
+                except json.JSONDecodeError:
+                    result_container.error("🔥 Server returned invalid JSON")
+                    with st.expander("Response Details"):
+                        st.code(response.text[:1000])
+                    st.stop()
+            else:
+                result_container.error("🔥 Server returned non-JSON response")
+                with st.expander("Response Details"):
+                    st.write(f"Status Code: {response.status_code}")
+                    st.write(f"Content Type: {response.headers.get('Content-Type')}")
+                    st.code(response.text[:1000])
                 st.stop()
             
-            try:
-                response_data = response.json()
-            except json.JSONDecodeError:
-                result_container.error("🔥 Failed to parse JSON response")
-                with st.expander("Show response content"):
-                    st.code(response.text[:1000])
-                progress_bar.empty()
-                status_text.empty()
-                st.stop()
             
             if response.status_code == 429:
                 error_data = response_data
