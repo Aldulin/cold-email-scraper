@@ -6,7 +6,7 @@ import uuid
 import json
 
 # Configuration
-API_URL = "https://cold-email-scraper.fly.dev/scrape"  # Update with your backend URL
+API_URL = "https://cold-email-scraper.fly.dev/"  # Update with your backend URL
 FREE_DAILY_SEARCHES = 3
 REFERRAL_BONUS = 2
 PROGRESS_STEPS = 5  # Number of progress steps
