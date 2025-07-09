@@ -11,7 +11,7 @@ FREE_DAILY_SEARCHES = 3
 REFERRAL_BONUS = 2
 PROGRESS_STEPS = 5  # Number of progress steps
 
-TEST_MODE = True  # Set to True for testing 
+TEST_MODE = False  # Set to True for testing 
 
 
 # Initialize session state
