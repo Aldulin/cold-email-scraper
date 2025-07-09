@@ -6,7 +6,7 @@ import uuid
 import json
 
 # Configuration
-API_URL = "https://cold-email-scraper.fly.dev/scrape"  # Update with your backend URL
+API_URL = "https://cold-email-scraper.fly.dev/"  # Update with your backend URL
 FREE_DAILY_SEARCHES = 3
 REFERRAL_BONUS = 2
 PROGRESS_STEPS = 5  # Number of progress steps
@@ -95,29 +95,39 @@ if submit:
                 time.sleep(0.3)
             
             # Make API request
+            full_url = f"{API_URL}scrape"
             response = requests.post(
-                f"{API_URL}scrape",
+                full_url,
                 json=payload,
                 headers=headers,
                 timeout=90  # Extended timeout
             )
+            # DEBUGGING: Print URL and status code
+            print(f"Request URL: {full_url}")
             print(f"Status Code: {response.status_code}")
-            print("Response content:", response.text[:500])  # Debugging line
+            
             # Handle response content
-            if 'application/json' in response.headers.get('Content-Type', ''):
-                try:
-                    response_data = response.json()
-                except json.JSONDecodeError:
-                    result_container.error("🔥 Server returned invalid JSON")
-                    with st.expander("Response Details"):
-                        st.code(response.text[:1000])
-                    st.stop()
-            else:
-                result_container.error("🔥 Server returned non-JSON response")
+            content_type = response.headers.get('Content-Type', '')
+            is_json = 'application/json' in content_type
+            if not is_json:
+                result_container.error(f"🔥 Server returned non-JSON response (Status: {response.status_code})")
                 with st.expander("Response Details"):
+                    st.write(f"URL: {full_url}")
                     st.write(f"Status Code: {response.status_code}")
-                    st.write(f"Content Type: {response.headers.get('Content-Type')}")
+                    st.write(f"Content Type: {content_type}")
                     st.code(response.text[:1000])
+                progress_bar.empty()
+                status_text.empty()
+                st.stop()
+            
+            try:
+                response_data = response.json()
+            except json.JSONDecodeError:
+                result_container.error("🔥 Failed to parse JSON response")
+                with st.expander("Show response content"):
+                    st.code(response.text[:1000])
+                progress_bar.empty()
+                status_text.empty()
                 st.stop()
             
             
