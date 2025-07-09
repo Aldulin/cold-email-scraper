@@ -92,7 +92,7 @@ if submit:
             payload = {
                 "keyword": keyword, 
                 "location": location, 
-                "count": min(count, 10)  # Free tier limit
+                "count": count  # Free tier limit
             }
             
             # Show progress
