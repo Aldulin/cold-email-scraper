@@ -12,7 +12,7 @@ REFERRAL_BONUS = 2
 PROGRESS_STEPS = 5  # Number of progress steps
 
 TEST_MODE = False  # Set to True for testing 
-
+MAX_RESULTS = 50 if TEST_MODE else 20
 
 # Initialize session state
 if 'session_id' not in st.session_state:
@@ -67,8 +67,14 @@ with st.form("scrape_form"):
     with col2:
         location = st.text_input("📍 Location", placeholder="e.g. London, Berlin", key="loc")
     
-    count = st.slider("Results to fetch", 5, 30, 10, 5,
-                      help="Free users limited to 10 results per search")
+    count = st.slider(
+        "Results to fetch", 
+        5, 
+        MAX_RESULTS, 
+        10, 
+        5,
+        help=f"Maximum {MAX_RESULTS} results per search"
+    )
     submit = st.form_submit_button("🚀 Scrape Leads")
 
 # --- Scrape Logic ---
@@ -92,7 +98,7 @@ if submit:
             payload = {
                 "keyword": keyword, 
                 "location": location, 
-                "count": count  # Free tier limit
+                "count": count 
             }
             
             # Show progress
