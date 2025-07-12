@@ -91,15 +91,20 @@ if submit:
                 "X-Referral-Code": st.session_state.referral_code or "",
                 "Content-Type": "application/json"
             }
-
+            
             if TEST_MODE:
                 headers["X-Test-Mode"] = "true"
-
+            
             payload = {
                 "keyword": keyword, 
                 "location": location, 
-                "count": count 
+                "count": count
             }
+            
+            # Debug print
+            print(f"API Request: {API_URL}scrape")
+            print(f"Headers: {headers}")
+            print(f"Payload: {payload}")
             
             # Show progress
             for i in range(PROGRESS_STEPS):
