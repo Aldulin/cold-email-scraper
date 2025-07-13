@@ -91,13 +91,33 @@ if submit:
                     time.sleep(0.3)
                 
                 # API call
-                response = requests.post(
+                try:
+                    response = requests.post(
                     f"{API_URL}scrape",
                     json=payload,
                     headers=headers,
                     timeout=90
-                )
+                    )
+
+    # Handle non-JSON responses
+                    try:
+                        response_data = response.json()
+                    except ValueError:
+                        result_container.error(f"Server returned malformed response (Status: {response.status_code})")
+                        with st.expander("Response Details"):
+                            st.write(f"URL: {API_URL}scrape")
+                            st.write(f"Status Code: {response.status_code}")
+                            st.write(f"Content: {response.text[:1000]}")
+                        st.stop()
+        
+                    if response.status_code == 502:
+                        result_container.error("Backend service unavailable. Please try again later.")
+                        st.stop()
                 
+                except Exception as api_exc:
+                    result_container.error(f"API request failed: {str(api_exc)}")
+                    st.stop()
+
                 if response.status_code == 429:
                     error = response.json()
                     st.error(f"❌ {error.get('error')}: {error.get('used')}/{error.get('limit')} used")
