@@ -98,7 +98,13 @@ if submit:
                     headers=headers,
                     timeout=90
                     )
-
+                    if not response.headers.get('Content-Type', '').startswith('application/json'):
+                        st.error("Server returned non-JSON response")
+                        with st.expander("Show raw response"):
+                            st.code(response.text[:1000])
+                        st.stop()
+    
+                    data = response.json()
     # Handle non-JSON responses
                     try:
                         response_data = response.json()
