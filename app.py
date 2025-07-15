@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import time
 import uuid
-import json
 import os
 from datetime import datetime
 
@@ -34,7 +33,6 @@ with st.sidebar:
     st.subheader("Your Account")
     st.caption(f"**Session ID:** `{st.session_state.session_id[:8]}`")
     
-    # Usage metrics
     daily_used = st.session_state.usage['daily']
     daily_remaining = max(0, st.session_state.available_searches - daily_used)
     
@@ -44,129 +42,111 @@ with st.sidebar:
     st.metric("👥 Referrals", st.session_state.usage['referrals'],
              f"+{st.session_state.usage['referrals'] * REFERRAL_BONUS} searches")
     
-    # Referral system
+    # Referral
     st.divider()
     referral_link = f"{API_URL}?referral_code={st.session_state.session_id}"
     st.caption("Invite friends for bonus searches:")
-    if st.button("📋 Copy Referral Link", key="copy_referral"):
-        st.session_state.referral_code = st.session_state.session_id
-        st.success("Copied to clipboard!")
+    st.code(referral_link)
+    st.button("📋 Copy Referral Link", key="copy_referral", help="Copy manually for now.")
 
-# Main form
+# Search Form
 with st.form("scrape_form"):
     col1, col2 = st.columns(2)
-    with col1:
-        keyword = st.text_input("🔍 Business type", placeholder="e.g. dentist, gym")
-    with col2:
-        location = st.text_input("📍 Location", placeholder="e.g. London, Berlin")
-    
+    keyword = col1.text_input("🔍 Business type", placeholder="e.g. dentist, gym")
+    location = col2.text_input("📍 Location", placeholder="e.g. London, Berlin")
     count = st.slider("Results to fetch", 5, MAX_RESULTS, 10, 5)
     submit = st.form_submit_button("🚀 Scrape Leads")
 
+# Submit action
 if submit:
     if not keyword or not location:
         st.warning("Please enter both keyword and location")
-    else:
-        with st.spinner("Processing your request..."):
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            result_container = st.empty()
-            
+        st.stop()
+
+    with st.spinner("Processing your request..."):
+        progress_bar = st.progress(0)
+        result_container = st.empty()
+        status_text = st.empty()
+
+        headers = {
+            "X-Referral-Code": st.session_state.referral_code or "",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "keyword": keyword,
+            "location": location,
+            "count": count
+        }
+
+        try:
+            for i in range(PROGRESS_STEPS):
+                status_text.info(f"🔍 Step {i+1}/{PROGRESS_STEPS}")
+                progress_bar.progress((i + 1) * (100 // PROGRESS_STEPS))
+                time.sleep(0.3)
+
+            response = requests.post(f"{API_URL}scrape", json=payload, headers=headers, timeout=90)
+
+            # Validate content type
+            content_type = response.headers.get("Content-Type", "")
+            if not content_type.startswith("application/json"):
+                result_container.error("🔥 Server returned non-JSON response.")
+                with st.expander("Raw response"):
+                    st.code(response.text[:1000])
+                st.stop()
+
             try:
-                headers = {
-                    "X-Referral-Code": st.session_state.referral_code or "",
-                    "Content-Type": "application/json"
-                }
-                
-                payload = {
-                    "keyword": keyword, 
-                    "location": location, 
-                    "count": count
-                }
-                
-                # Animated progress
-                for i in range(PROGRESS_STEPS):
-                    status_text.info(f"🔍 Step {i+1}/{PROGRESS_STEPS}: Processing...")
-                    progress_bar.progress((i+1) * (100 // PROGRESS_STEPS))
-                    time.sleep(0.3)
-                
-                # API call
-                try:
-                    response = requests.post(
-                    f"{API_URL}scrape",
-                    json=payload,
-                    headers=headers,
-                    timeout=90
-                    )
-                    if not response.headers.get('Content-Type', '').startswith('application/json'):
-                        st.error("Server returned non-JSON response")
-                        with st.expander("Show raw response"):
-                            st.code(response.text[:1000])
-                        st.stop()
-    
-                    data = response.json()
-    # Handle non-JSON responses
-                    try:
-                        response_data = response.json()
-                    except ValueError:
-                        result_container.error(f"Server returned malformed response (Status: {response.status_code})")
-                        with st.expander("Response Details"):
-                            st.write(f"URL: {API_URL}scrape")
-                            st.write(f"Status Code: {response.status_code}")
-                            st.write(f"Content: {response.text[:1000]}")
-                        st.stop()
-        
-                    if response.status_code == 502:
-                        result_container.error("Backend service unavailable. Please try again later.")
-                        st.stop()
-                
-                except Exception as api_exc:
-                    result_container.error(f"API request failed: {str(api_exc)}")
-                    st.stop()
+                data = response.json()
+            except ValueError:
+                result_container.error("🔥 Malformed JSON response.")
+                with st.expander("Raw response"):
+                    st.code(response.text[:1000])
+                st.stop()
 
-                if response.status_code == 429:
-                    error = response.json()
-                    st.error(f"❌ {error.get('error')}: {error.get('used')}/{error.get('limit')} used")
-                elif response.status_code != 200:
-                    st.error(f"❌ Error: {response.text[:200]}")
-                else:
-                    data = response.json()
-                    st.session_state.usage = {
-                        'daily': data['usage']['daily'],
-                        'monthly': data['usage']['monthly'],
-                        'referrals': data['usage']['referrals']
-                    }
-                    st.session_state.last_search = datetime.now()
-                    
-                    if data.get('results'):
-                        df = pd.DataFrame(data['results'])
-                        df = df[["name", "email", "phone", "website", "address", "score"]]
-                        df = df[df['email'].notna() | df['phone'].notna()]
-                        
-                        if not df.empty:
-                            result_container.success(f"✅ Found {len(df)} leads in {data['stats']['time']:.1f}s")
-                            
-                            # Export options
-                            csv = df.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                "📥 Download CSV", 
-                                csv,
-                                file_name=f"{keyword}_{location}_leads.csv",
-                                mime="text/csv"
-                            )
-                            
-                            st.dataframe(df, use_container_width=True)
-                        else:
-                            result_container.info("No valid leads found")
-                
-            except Exception as e:
-                result_container.error(f"🔥 Error: {str(e)}")
-            finally:
-                progress_bar.progress(100)
-                time.sleep(0.5)
-                progress_bar.empty()
+            # Handle specific errors
+            if response.status_code == 429:
+                st.error(f"❌ {data.get('error')}: limit {data.get('limit')}, used {data.get('used')}")
+                st.stop()
+            elif response.status_code != 200:
+                st.error(f"❌ API Error: {data.get('error', 'Unknown error')}")
+                st.stop()
 
-# Upgrade section
+            # Success
+            st.session_state.usage = {
+                'daily': data['usage']['daily'],
+                'monthly': data['usage']['monthly'],
+                'referrals': data['usage']['referrals']
+            }
+
+            results = data.get("results", [])
+            df = pd.DataFrame(results)
+
+            if df.empty:
+                result_container.info("No leads found.")
+            else:
+                df = df[["name", "email", "phone", "website", "address", "rating"]]
+                df = df[df["email"].notna() | df["phone"].notna()]
+
+                result_container.success(f"✅ Found {len(df)} leads in {data['stats']['time']:.2f}s")
+
+                csv = df.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="📥 Download CSV",
+                    data=csv,
+                    file_name=f"{keyword}_{location}_leads.csv",
+                    mime="text/csv"
+                )
+                st.dataframe(df, use_container_width=True)
+
+        except Exception as e:
+            result_container.error(f"🔥 Unexpected error: {str(e)}")
+
+        finally:
+            progress_bar.progress(100)
+            time.sleep(0.5)
+            progress_bar.empty()
+            status_text.empty()
+
+# Upsell section
 st.divider()
 st.subheader("🚀 Premium Features")
 cols = st.columns(3)
