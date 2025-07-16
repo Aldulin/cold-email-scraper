@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # Config
-API_URL = "https://cold-email-scraper.fly.dev/"
+API_URL = "https://cold-email-scraper.fly.dev"
 API_KEY = st.secrets.get("API_KEY", "")
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
@@ -78,19 +78,27 @@ with tab1:
                         "Content-Type": "application/json"
                         }
 
+                        api_url = API_URL.rstrip('/')
                         resp = requests.post(
                             f"{API_URL}/scrape",
-                            json={"keyword": keyword, "location": location, "count": count},
+                            json={"keyword": keyword, 
+                                  "location": location, 
+                                  "count": count
+                                  },
                             headers=headers,
                             timeout=30
                         )
     
     # Handle response status
-                        if resp.status_code != 200:
-                            st.error(f"API Error ({resp.status_code}): {resp.text[:200]}")
+                        try:
+                            data = resp.json()
+                        except ValueError:
+                            st.error(f"Invalid response from server: {resp.text[:200]}")
                             st.stop()
         
-                        data = resp.json()
+                        if resp.status_code != 200:
+                            st.error(f"API Error ({resp.status_code}): {data.get('error', 'Unknown error')}")
+                            st.stop()
 
                         if "error" in data:
                             st.error(data["error"])
