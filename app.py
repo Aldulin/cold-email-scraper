@@ -70,24 +70,35 @@ with tab1:
                 st.warning("Please enter both fields")
             else:
                 with st.spinner("Searching..."):
+                    API_KEYS = set()
                     try:
                         headers = {
-                            "X-API-Key": st.session_state.api_key,
-                            "X-Referral-Code": st.session_state.referral_code
+                        "X-Referral-Code": st.session_state.referral_code or "",
+                        "X-API-Key": st.session_state.api_key,
+                        "Content-Type": "application/json"
                         }
+
                         resp = requests.post(
-                            f"{API_URL}scrape",
+                            f"{API_URL}/scrape",
                             json={"keyword": keyword, "location": location, "count": count},
-                            headers=headers
-                        ).json()
-                        
-                        if "error" in resp:
-                            st.error(resp["error"])
+                            headers=headers,
+                            timeout=30
+                        )
+    
+    # Handle response status
+                        if resp.status_code != 200:
+                            st.error(f"API Error ({resp.status_code}): {resp.text[:200]}")
+                            st.stop()
+        
+                        data = resp.json()
+
+                        if "error" in data:
+                            st.error(data["error"])
                             st.write("Status code:", resp.status_code)
                             st.write("Content-Type:", resp.headers.get("Content-Type", ""))
                             st.code(resp.text[:1000])  # Show raw response
                         else:
-                            df = pd.DataFrame(resp["results"])
+                            df = pd.DataFrame(data["results"])
                             if not df.empty:
                                 st.download_button(
                                     "📥 Download CSV",
