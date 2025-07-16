@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # Config
-API_URL = os.getenv("API_URL", "https://cold-email-scraper.fly.dev/")
+API_URL = "https://cold-email-scraper.fly.dev/"
 API_KEY = st.secrets.get("API_KEY", "")
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
@@ -76,7 +76,7 @@ with tab1:
                             "X-Referral-Code": st.session_state.referral_code
                         }
                         resp = requests.post(
-                            f"{API_URL}/scrape",
+                            f"{API_URL}scrape",
                             json={"keyword": keyword, "location": location, "count": count},
                             headers=headers
                         ).json()
