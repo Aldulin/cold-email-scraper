@@ -83,6 +83,9 @@ with tab1:
                         
                         if "error" in resp:
                             st.error(resp["error"])
+                            st.write("Status code:", resp.status_code)
+                            st.write("Content-Type:", resp.headers.get("Content-Type", ""))
+                            st.code(resp.text[:1000])  # Show raw response
                         else:
                             df = pd.DataFrame(resp["results"])
                             if not df.empty:
