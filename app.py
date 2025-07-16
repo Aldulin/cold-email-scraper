@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # Config
-API_URL = os.getenv("API_URL", "http://localhost:8080")
+API_URL = os.getenv("API_URL", "https://cold-email-scraper.fly.dev/")
 API_KEY = st.secrets.get("API_KEY", "")
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
