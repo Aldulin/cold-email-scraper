@@ -33,20 +33,31 @@ with st.sidebar:
     st.metric("Plan", tier)
     
     if not st.session_state.premium:
-        with st.expander("🔑 Activate Premium"):
+        with st.sidebar.expander("🔑 Activate Premium"):
             license_key = st.text_input("Enter Gumroad License Key")
-            if st.button("Activate"):
-                try:
-                    resp = requests.post(
-                        f"{API_URL}/activate",
-                        json={"key": license_key},
-                        headers={"X-API-Key": API_KEY}
-                    ).json()
-                    if resp.get("success"):
-                        st.session_state.premium = True
-                        st.success("Premium Activated!")
-                except Exception as e:
-                    st.error(f"Activation failed: {str(e)}")
+            if st.button("Activate Premium"):
+                if not license_key:
+                    st.warning("Please enter a license key")
+                else:
+                    try:
+                        resp = requests.post(
+                            f"{API_URL}/activate",
+                            json={"key": license_key},
+                            headers={"X-API-Key": st.session_state.api_key}
+                        )
+
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            if data.get("success"):
+                                st.session_state.premium = True
+                                st.success(f"✅ Premium {data['tier'].title()} Activated!")
+                                st.balloons()
+                            else:
+                                st.error(f"❌ Activation failed: {data.get('error', 'Unknown error')}")
+                        else:
+                            st.error(f"❌ Activation failed (HTTP {resp.status_code}): {resp.text[:200]}")
+                    except Exception as e:
+                        st.error(f"🚨 Connection error: {str(e)}")
     
     # Usage stats
     st.divider()
@@ -63,7 +74,14 @@ with tab1:
         cols = st.columns(2)
         keyword = cols[0].text_input("Business Type", placeholder="e.g. dentist")
         location = cols[1].text_input("Location", placeholder="e.g. New York")
-        count = st.slider("Results", 5, 50, 10)
+        if st.session_state.get('premium_tier') == "pro":
+            max_results = 100
+        elif st.session_state.get('premium_tier') == "enterprise":
+            max_results = 200
+        else:
+            max_results = 20  # Free or starter
+
+        count = st.slider("Results", 5, max_results, min(max_results, 10))
         
         if st.form_submit_button("🚀 Find Leads"):
             if not keyword or not location:
@@ -124,16 +142,19 @@ with tab2:
     cols = st.columns(3)
     with cols[0]:
         st.markdown("**Starter Plan**")
-        st.write("- 100 searches/day")
+        st.write("- 50 searches/day")
         st.write("- Basic validation")
-        st.link_button("$9.99/month", "https://gumroad.com/l/starter")
+        st.write("- $9.99/month")
+        st.link_button("Buy Now", "https://gumroad.com/l/starter")
     with cols[1]:
         st.markdown("**Pro Plan**")
-        st.write("- 500 searches/day")
+        st.write("- 100 searches/day")
         st.write("- API access")
-        st.link_button("$24.99/month", "https://gumroad.com/l/pro")
+        st.write("- $24.99/month")
+        st.link_button("Buy Now", "https://gumroad.com/l/pro")
     with cols[2]:
         st.markdown("**Enterprise**")
         st.write("- Unlimited searches")
         st.write("- Priority support")
+        st.write("- Custom pricing")
         st.link_button("Contact Us", "mailto:support@example.com")
