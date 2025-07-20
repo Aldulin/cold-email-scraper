@@ -91,6 +91,7 @@ tab1, tab2 = st.tabs(["🔍 Search", "💎 Premium"])
 
 # ────────────── SEARCH TAB ──────────────
 with tab1:
+    df = pd.DataFrame()
     with st.form("search_form"):
         cols = st.columns(2)
         keyword = cols[0].text_input("Business Type", placeholder="e.g. dentist")
@@ -101,8 +102,8 @@ with tab1:
         max_results = max_map.get(tier, 20)
 
         count = st.slider("Number of Results", 5, max_results, min(max_results, 10))
-
-        if st.form_submit_button("🚀 Find Leads"):
+        submit = st.form_submit_button("🚀 Find Leads")
+        if submit:
             if not keyword or not location:
                 st.warning("Please enter both keyword and location.")
             else:
@@ -134,16 +135,17 @@ with tab1:
                                 st.code(resp.text)
                             st.stop()
 
-                        if "error" in data:
+                        elif "error" in data:
                             st.error(data["error"])
                             st.stop()
-
-                        st.session_state.usage = data.get("usage", st.session_state.usage)
-                        df = pd.DataFrame(data.get("results", []))
+                        else:
+                            st.session_state.usage = data.get("usage", st.session_state.usage)
+                            df = pd.DataFrame(data.get("results", []))
 
 
                     except Exception as e:
                         st.error(f"❌ Search failed: {str(e)}")
+if submit:
     if df.empty:
         st.info("No leads found.")
     else:
@@ -151,7 +153,7 @@ with tab1:
             "📥 Download CSV",
             df.to_csv(index=False),
             file_name=f"leads_{keyword}_{location}.csv"
-            )
+        )
         st.dataframe(df)
 
 # ────────────── PREMIUM TAB ──────────────
