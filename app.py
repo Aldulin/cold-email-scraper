@@ -7,10 +7,7 @@ from datetime import datetime
 # ─────────────────────────────────────────────
 # Config
 API_URL = "https://cold-email-scraper.fly.dev"
-API_KEY = os.getenv("API_KEY", "")
-if not API_KEY:
-    st.error("API_KEY not configured")
-    st.stop()
+API_KEY = os.getenv("API_KEY", "")  # Default fallback
 
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
@@ -27,11 +24,14 @@ if "premium_tier" not in st.session_state:
     st.session_state.premium_tier = "free"
 if "premium" not in st.session_state:
     st.session_state.premium = False
+if "API_KEY" not in st.session_state:
+    st.session_state.API_KEY = API_KEY
 
-# Try to get status/tier from backend
+# ─────────────────────────────────────────────
+# Status Fetching
 def fetch_status():
     try:
-        r = requests.get(f"{API_URL}/status", headers={"X-API-Key": API_KEY}, timeout=10)
+        r = requests.get(f"{API_URL}/status", headers={"X-API-Key": st.session_state.API_KEY}, timeout=10)
         if r.ok:
             tier = r.json().get("tier", "free")
             st.session_state.premium_tier = tier
@@ -65,7 +65,7 @@ with st.sidebar:
                         resp = requests.post(
                             f"{API_URL}/activate",
                             json={"key": license_key},
-                            headers={"X-API-Key": API_KEY}
+                            headers={"X-API-Key": st.session_state.API_KEY}
                         )
                         if resp.status_code == 200:
                             data = resp.json()
@@ -85,13 +85,21 @@ with st.sidebar:
     st.metric("🔍 Daily Searches", f"{st.session_state.usage['daily']}/{limits['daily']}")
     st.metric("🗓️ Monthly Searches", f"{st.session_state.usage['monthly']}/{limits['monthly']}")
 
+    # ────────────── Test Key Input (Dev Mode) ──────────────
+    st.subheader("🔐 Developer/Test Access")
+    test_key = st.text_input("Insert Test API Key (dev only)", type="pijoye")
+    if test_key:
+        st.session_state.API_KEY = test_key
+        st.session_state.premium = True
+        st.session_state.premium_tier = "enterprise"
+        st.success("✅ Test key inserted. Premium mode enabled.")
+
 # ─────────────────────────────────────────────
 # Tabs
 tab1, tab2 = st.tabs(["🔍 Search", "💎 Premium"])
 
 # ────────────── SEARCH TAB ──────────────
 with tab1:
-    df = pd.DataFrame()
     with st.form("search_form"):
         cols = st.columns(2)
         keyword = cols[0].text_input("Business Type", placeholder="e.g. dentist")
@@ -102,59 +110,60 @@ with tab1:
         max_results = max_map.get(tier, 20)
 
         count = st.slider("Number of Results", 5, max_results, min(max_results, 10))
+
         submit = st.form_submit_button("🚀 Find Leads")
-        if submit:
-            if not keyword or not location:
-                st.warning("Please enter both keyword and location.")
-            else:
-                with st.spinner("Searching..."):
+
+    if submit:
+        if not keyword or not location:
+            st.warning("Please enter both keyword and location.")
+        else:
+            with st.spinner("Searching..."):
+                try:
+                    headers = {
+                        "X-API-Key": st.session_state.API_KEY,
+                        "Content-Type": "application/json"
+                    }
+                    resp = requests.post(
+                        f"{API_URL}/scrape",
+                        json={
+                            "keyword": keyword,
+                            "location": location,
+                            "count": count
+                        },
+                        headers=headers,
+                        timeout=30
+                    )
                     try:
-                        headers = {
-                            "X-API-Key": API_KEY,
-                            "Content-Type": "application/json"
-                        }
-                        resp = requests.post(
-                            f"{API_URL}/scrape",
-                            json={
-                                "keyword": keyword,
-                                "location": location,
-                                "count": count
-                            },
-                            headers=headers,
-                            timeout=30
+                        data = resp.json()
+                    except Exception:
+                        st.error("❌ Invalid JSON response from server.")
+                        st.stop()
+
+                    if resp.status_code != 200:
+                        st.error(f"❌ API Error ({resp.status_code}): {data.get('error', 'Unknown error')}")
+                        with st.expander("Debug Info"):
+                            st.code(resp.text)
+                        st.stop()
+
+                    if "error" in data:
+                        st.error(data["error"])
+                        st.stop()
+
+                    st.session_state.usage = data.get("usage", st.session_state.usage)
+                    df = pd.DataFrame(data.get("results", []))
+
+                    if df.empty:
+                        st.info("No leads found.")
+                    else:
+                        st.download_button(
+                            "📥 Download CSV",
+                            df.to_csv(index=False),
+                            file_name=f"leads_{keyword}_{location}.csv"
                         )
-                        try:
-                            data = resp.json()
-                        except Exception:
-                            st.error("❌ Invalid JSON response from server.")
-                            st.stop()
+                        st.dataframe(df)
 
-                        if resp.status_code != 200:
-                            st.error(f"❌ API Error ({resp.status_code}): {data.get('error', 'Unknown error')}")
-                            with st.expander("Debug Info"):
-                                st.code(resp.text)
-                            st.stop()
-
-                        elif "error" in data:
-                            st.error(data["error"])
-                            st.stop()
-                        else:
-                            st.session_state.usage = data.get("usage", st.session_state.usage)
-                            df = pd.DataFrame(data.get("results", []))
-
-
-                    except Exception as e:
-                        st.error(f"❌ Search failed: {str(e)}")
-if submit:
-    if df.empty:
-        st.info("No leads found.")
-    else:
-        st.download_button(
-            "📥 Download CSV",
-            df.to_csv(index=False),
-            file_name=f"leads_{keyword}_{location}.csv"
-        )
-        st.dataframe(df)
+                except Exception as e:
+                    st.error(f"❌ Search failed: {str(e)}")
 
 # ────────────── PREMIUM TAB ──────────────
 with tab2:
