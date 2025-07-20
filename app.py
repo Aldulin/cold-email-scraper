@@ -141,18 +141,18 @@ with tab1:
                         st.session_state.usage = data.get("usage", st.session_state.usage)
                         df = pd.DataFrame(data.get("results", []))
 
-                        if df.empty:
-                            st.info("No leads found.")
-                        else:
-                            st.download_button(
-                                "📥 Download CSV",
-                                df.to_csv(index=False),
-                                file_name=f"leads_{keyword}_{location}.csv"
-                            )
-                            st.dataframe(df)
 
                     except Exception as e:
                         st.error(f"❌ Search failed: {str(e)}")
+    if df.empty:
+        st.info("No leads found.")
+    else:
+        st.download_button(
+            "📥 Download CSV",
+            df.to_csv(index=False),
+            file_name=f"leads_{keyword}_{location}.csv"
+            )
+        st.dataframe(df)
 
 # ────────────── PREMIUM TAB ──────────────
 with tab2:
