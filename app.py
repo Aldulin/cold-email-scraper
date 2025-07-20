@@ -85,14 +85,29 @@ with st.sidebar:
     st.metric("🔍 Daily Searches", f"{st.session_state.usage['daily']}/{limits['daily']}")
     st.metric("🗓️ Monthly Searches", f"{st.session_state.usage['monthly']}/{limits['monthly']}")
 
-    # ────────────── Test Key Input (Dev Mode) ──────────────
-    st.subheader("🔐 Developer/Test Access")
-    test_key = st.text_input("Insert Test API Key (dev only)", type="password")
-    if test_key:
-        st.session_state.API_KEY = test_key
-        st.session_state.premium = True
-        st.session_state.premium_tier = "enterprise"
-        st.success("✅ Test key inserted. Premium mode enabled.")
+  # ────────────── Test Key Input (Dev Mode) ──────────────
+st.subheader("🔐 Developer/Test Access")
+test_key = st.text_input("Insert Test API Key (dev only)", type="password")
+if st.button("Force Register Test Key"):
+    if not test_key:
+        st.warning("Enter a test API key")
+    else:
+        try:
+            resp = requests.post(
+                f"{API_URL}/activate",
+                json={"key": "TEST_FAKE_LICENSE"},
+                headers={"X-API-Key": test_key}
+            )
+            if resp.ok and resp.json().get("success"):
+                st.session_state.API_KEY = test_key
+                st.session_state.premium = True
+                st.session_state.premium_tier = resp.json().get("tier", "enterprise")
+                st.success("✅ Test key registered and activated.")
+                st.balloons()
+            else:
+                st.error(f"Activation failed: {resp.text}")
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 # ─────────────────────────────────────────────
 # Tabs
