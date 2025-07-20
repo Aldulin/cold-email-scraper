@@ -7,7 +7,10 @@ from datetime import datetime
 # ─────────────────────────────────────────────
 # Config
 API_URL = "https://cold-email-scraper.fly.dev"
-API_KEY = os.getenv("API_KEY", "")  # Default fallback
+API_KEY = os.getenv("API_KEY", "")
+if not API_KEY:
+    st.error("API_KEY not configured")
+    st.stop()
 
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
@@ -24,14 +27,12 @@ if "premium_tier" not in st.session_state:
     st.session_state.premium_tier = "free"
 if "premium" not in st.session_state:
     st.session_state.premium = False
-if "API_KEY" not in st.session_state:
-    st.session_state.API_KEY = API_KEY
 
 # ─────────────────────────────────────────────
-# Status Fetching
+# Fetch current premium tier
 def fetch_status():
     try:
-        r = requests.get(f"{API_URL}/status", headers={"X-API-Key": st.session_state.API_KEY}, timeout=10)
+        r = requests.get(f"{API_URL}/status", headers={"X-API-Key": API_KEY}, timeout=10)
         if r.ok:
             tier = r.json().get("tier", "free")
             st.session_state.premium_tier = tier
@@ -56,7 +57,7 @@ with st.sidebar:
 
     if not st.session_state.premium:
         with st.expander("🔑 Activate Premium"):
-            license_key = st.text_input("Enter Gumroad License Key")
+            license_key = st.text_input("Enter Test License Key (e.g. TEST_STARTER)")
             if st.button("Activate Premium"):
                 if not license_key:
                     st.warning("Please enter a license key")
@@ -65,7 +66,7 @@ with st.sidebar:
                         resp = requests.post(
                             f"{API_URL}/activate",
                             json={"key": license_key},
-                            headers={"X-API-Key": st.session_state.API_KEY}
+                            headers={"X-API-Key": API_KEY}
                         )
                         if resp.status_code == 200:
                             data = resp.json()
@@ -74,6 +75,7 @@ with st.sidebar:
                                 st.session_state.premium_tier = data["tier"]
                                 st.success(f"✅ Premium {data['tier'].title()} Activated!")
                                 st.balloons()
+                                fetch_status()  # Refresh usage/tier
                             else:
                                 st.error(f"❌ Activation failed: {data.get('error', 'Unknown error')}")
                         else:
@@ -84,30 +86,6 @@ with st.sidebar:
     st.divider()
     st.metric("🔍 Daily Searches", f"{st.session_state.usage['daily']}/{limits['daily']}")
     st.metric("🗓️ Monthly Searches", f"{st.session_state.usage['monthly']}/{limits['monthly']}")
-
-  # ────────────── Test Key Input (Dev Mode) ──────────────
-st.subheader("🔐 Developer/Test Access")
-test_key = st.text_input("Insert Test API Key (dev only)", type="password")
-if st.button("Force Register Test Key"):
-    if not test_key:
-        st.warning("Enter a test API key")
-    else:
-        try:
-            resp = requests.post(
-                f"{API_URL}/activate",
-                json={"key": "TEST_FAKE_LICENSE"},
-                headers={"X-API-Key": test_key}
-            )
-            if resp.ok and resp.json().get("success"):
-                st.session_state.API_KEY = test_key
-                st.session_state.premium = True
-                st.session_state.premium_tier = resp.json().get("tier", "enterprise")
-                st.success("✅ Test key registered and activated.")
-                st.balloons()
-            else:
-                st.error(f"Activation failed: {resp.text}")
-        except Exception as e:
-            st.error(f"Error: {e}")
 
 # ─────────────────────────────────────────────
 # Tabs
@@ -126,16 +104,16 @@ with tab1:
 
         count = st.slider("Number of Results", 5, max_results, min(max_results, 10))
 
-        submit = st.form_submit_button("🚀 Find Leads")
+        submitted = st.form_submit_button("🚀 Find Leads")
 
-    if submit:
+    if submitted:
         if not keyword or not location:
             st.warning("Please enter both keyword and location.")
         else:
             with st.spinner("Searching..."):
                 try:
                     headers = {
-                        "X-API-Key": st.session_state.API_KEY,
+                        "X-API-Key": API_KEY,
                         "Content-Type": "application/json"
                     }
                     resp = requests.post(
