@@ -87,7 +87,7 @@ with st.sidebar:
 
     # ────────────── Test Key Input (Dev Mode) ──────────────
     st.subheader("🔐 Developer/Test Access")
-    test_key = st.text_input("Insert Test API Key (dev only)", type="pijoye")
+    test_key = st.text_input("Insert Test API Key (dev only)", type="password")
     if test_key:
         st.session_state.API_KEY = test_key
         st.session_state.premium = True
