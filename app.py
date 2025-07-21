@@ -124,7 +124,7 @@ with tab1:
                             "count": count
                         },
                         headers=headers,
-                        timeout=30
+                        timeout=60
                     )
                     try:
                         data = resp.json()
