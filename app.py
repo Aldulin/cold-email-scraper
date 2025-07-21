@@ -75,7 +75,7 @@ with st.sidebar:
                                 st.session_state.premium_tier = data["tier"]
                                 st.success(f"✅ Premium {data['tier'].title()} Activated!")
                                 st.balloons()
-                                fetch_status()  # Refresh usage/tier
+                                fetch_status()
                             else:
                                 st.error(f"❌ Activation failed: {data.get('error', 'Unknown error')}")
                         else:
@@ -87,6 +87,7 @@ with st.sidebar:
             st.session_state.premium = False
             st.session_state.premium_tier = "free"
             st.success("✅ Premium Deactivated")
+
     st.divider()
     st.metric("🔍 Daily Searches", f"{st.session_state.usage['daily']}/{limits['daily']}")
     st.metric("🗓️ Monthly Searches", f"{st.session_state.usage['monthly']}/{limits['monthly']}")
@@ -107,7 +108,6 @@ with tab1:
         max_results = max_map.get(tier, 20)
 
         count = st.slider("Number of Results", 5, max_results, min(max_results, 10))
-
         submitted = st.form_submit_button("🚀 Find Leads")
 
     if submitted:
@@ -136,14 +136,11 @@ with tab1:
                         st.error("❌ Invalid JSON response from server.")
                         st.stop()
 
-                    if resp.status_code != 200:
-                        st.error(f"❌ API Error ({resp.status_code}): {data.get('error', 'Unknown error')}")
+                    if resp.status_code != 200 or "error" in data:
+                        error_msg = data.get("error", "Unknown error")
+                        st.error(f"❌ API Error ({resp.status_code}): {error_msg}")
                         with st.expander("Debug Info"):
                             st.code(resp.text)
-                        st.stop()
-
-                    if "error" in data:
-                        st.error(data["error"])
                         st.stop()
 
                     st.session_state.usage = data.get("usage", st.session_state.usage)
@@ -152,8 +149,8 @@ with tab1:
                     if not results:
                         st.info("No leads found.")
                     else:
-                        st.write("✅ Found leads:", results)
-                        df = pd.json_normalize(results)
+                        df = pd.DataFrame(results)
+                        st.success(f"✅ Found {len(df)} leads!")
                         st.download_button(
                             "📥 Download CSV",
                             df.to_csv(index=False),
