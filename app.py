@@ -148,20 +148,15 @@ with st.sidebar:
                         if data.get("success"):
                             st.success(f"✅ Premium {data['tier'].title()} Activated!")
                             st.info(f"🔑 **Your Premium API Key:** `{data['api_key']}`")
-                            st.warning("⚠️ **IMPORTANT**: Save this API key for future logins!")
+                            st.warning("⚠️ **IMPORTANT**: Save this API key to login from other devices!")
+                            st.info("🌐 **Note**: Premium access is now active on this device/IP address")
                             
-                            # Auto-login with new key
-                            login_resp = requests.post(
-                                f"{API_URL}/login",
-                                json={"premium_key": data['api_key']},
-                                headers={"X-API-Key": API_KEY}
-                            )
-                            if login_resp.ok:
-                                st.session_state.premium = True
-                                st.session_state.premium_tier = data["tier"]
-                                st.balloons()
-                                time.sleep(2)
-                                st.rerun()
+                            # The session should already be started by the activation
+                            st.session_state.premium = True
+                            st.session_state.premium_tier = data["tier"]
+                            st.balloons()
+                            time.sleep(2)
+                            st.rerun()
                         else:
                             st.error(f"❌ Activation failed: {data.get('error', 'Invalid license key')}")
                     else:
