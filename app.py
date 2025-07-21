@@ -57,7 +57,7 @@ with st.sidebar:
 
     if not st.session_state.premium:
         with st.expander("🔑 Activate Premium"):
-            license_key = st.text_input("Enter Test License Key (e.g. TEST_STARTER)")
+            license_key = st.text_input("Enter License Key")
             if st.button("Activate Premium"):
                 if not license_key:
                     st.warning("Please enter a license key")
