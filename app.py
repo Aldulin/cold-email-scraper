@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+import time
 
 # ─────────────────────────────────────────────
 # Config
@@ -28,17 +29,23 @@ if "premium_tier" not in st.session_state:
 if "premium" not in st.session_state:
     st.session_state.premium = False
 
+if "last_results" not in st.session_state:
+    st.session_state.last_results = []
+
 # ─────────────────────────────────────────────
 # Fetch current premium tier
 def fetch_status():
     try:
         r = requests.get(f"{API_URL}/status", headers={"X-API-Key": API_KEY}, timeout=10)
         if r.ok:
-            tier = r.json().get("tier", "free")
+            data = r.json()
+            tier = data.get("tier", "free")
             st.session_state.premium_tier = tier
             st.session_state.premium = tier != "free"
-    except Exception:
-        pass
+            st.session_state.usage = data.get("usage", {"daily": 0, "monthly": 0})
+            st.session_state.reset = data.get("reset", {})
+    except Exception as e:
+        st.warning(f"Failed to fetch status: {e}")
 
 fetch_status()
 
@@ -46,14 +53,29 @@ fetch_status()
 # UI Setup
 st.set_page_config(layout="wide", page_title="Cold Email Scraper Pro", page_icon="📬")
 st.title("📬 Cold Email Scraper Pro")
+tier = st.session_state.premium_tier()
+
+reset = st.session_state.get("reset", {})
+now = datetime.now(timezone.utc)
+
+def time_until(iso_str):
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        delta = dt - now
+        if delta.total_seconds() <= 0:
+            return "now"
+        hours, remainder = divmod(int(delta.total_seconds()), 3600)
+        minutes, _ = divmod(remainder, 60)
+        return f"in {hours}h {minutes}m"
+    except:
+        return "unknown"
 
 # ─────────────────────────────────────────────
 # Sidebar
 with st.sidebar:
     st.subheader("Account Status")
-    tier = st.session_state.premium_tier.title()
-    limits = TIERS.get(st.session_state.premium_tier, TIERS['free'])
-    st.metric("Plan", tier)
+    limits = TIERS.get(tier, TIERS['free'])
+    st.metric("Plan", tier.title())
 
     if not st.session_state.premium:
         with st.expander("🔑 Activate Premium"):
@@ -75,6 +97,7 @@ with st.sidebar:
                                 st.session_state.premium_tier = data["tier"]
                                 st.success(f"✅ Premium {data['tier'].title()} Activated!")
                                 st.balloons()
+                                time.sleep(1)
                                 fetch_status()
                             else:
                                 st.error(f"❌ Activation failed: {data.get('error', 'Unknown error')}")
@@ -87,10 +110,18 @@ with st.sidebar:
             st.session_state.premium = False
             st.session_state.premium_tier = "free"
             st.success("✅ Premium Deactivated")
-
+    if st.button("🧹 Clear Previous Results"):
+        st.session_state.last_results = []
+        st.success("Previous results cleared.")
     st.divider()
-    st.metric("🔍 Daily Searches", f"{st.session_state.usage['daily']}/{limits['daily']}")
-    st.metric("🗓️ Monthly Searches", f"{st.session_state.usage['monthly']}/{limits['monthly']}")
+    st.metric("🔍 Daily Searches", f"{st.session_state.usage.get('daily', 0)}/{limits['daily']}")
+    st.metric("🗓️ Monthly Searches", f"{st.session_state.usage.get('monthly', 0)}/{limits['monthly']}")
+
+    if reset:
+        if "daily" in reset:
+            st.caption(f"🔁 Daily resets {time_until(reset['daily'])}")
+        if "monthly" in reset:
+            st.caption(f"📅 Monthly resets {time_until(reset['monthly'])}")
 
 # ─────────────────────────────────────────────
 # Tabs
@@ -103,7 +134,6 @@ with tab1:
         keyword = cols[0].text_input("Business Type", placeholder="e.g. dentist")
         location = cols[1].text_input("Location", placeholder="e.g. New York")
 
-        tier = st.session_state.premium_tier
         max_map = {"free": 20, "starter": 50, "pro": 100, "enterprise": 200}
         max_results = max_map.get(tier, 20)
 
@@ -145,9 +175,12 @@ with tab1:
 
                     st.session_state.usage = data.get("usage", st.session_state.usage)
                     results = data.get("results", [])
-
+                    st.session_state.last_results = results
                     if not results:
                         st.info("No leads found.")
+                    elif not results and st.session_state.last_results:
+                        st.warning("Showing your previous results.")
+                        results = st.session_state.last_results
                     else:
                         df = pd.DataFrame(results)
                         st.success(f"✅ Found {len(df)} leads!")
