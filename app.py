@@ -53,7 +53,7 @@ fetch_status()
 # UI Setup
 st.set_page_config(layout="wide", page_title="Cold Email Scraper Pro", page_icon="📬")
 st.title("📬 Cold Email Scraper Pro")
-tier = st.session_state.premium_tier()
+tier = st.session_state.premium_tier
 
 reset = st.session_state.get("reset", {})
 now = datetime.now(timezone.utc)
