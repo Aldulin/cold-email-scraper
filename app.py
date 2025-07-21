@@ -50,6 +50,14 @@ def fetch_status():
                 st.session_state.usage = data.get("usage", {"daily": 0, "monthly": 0})
                 st.session_state.reset = data.get("reset", {})
                 return True
+            elif r.status_code == 404:
+                # Status endpoint doesn't exist - set defaults
+                st.session_state.premium_tier = "free"
+                st.session_state.premium = False
+                st.session_state.usage = {"daily": 0, "monthly": 0}
+                st.session_state.reset = {}
+                st.warning("⚠️ Status endpoint not available - using defaults")
+                return False
             else:
                 error_detail = ""
                 try:
@@ -69,6 +77,18 @@ def fetch_status():
     except Exception as e:
         st.error(f"❌ Unexpected error: {str(e)}")
         return False
+
+# Add debug button to frontend
+if st.sidebar.button("🔍 Debug Info"):
+    try:
+        debug_resp = requests.get(f"{API_URL}/debug", headers={"X-API-Key": API_KEY})
+        if debug_resp.ok:
+            debug_data = debug_resp.json()
+            st.sidebar.json(debug_data)
+        else:
+            st.sidebar.error(f"Debug failed: {debug_resp.status_code}")
+    except Exception as e:
+        st.sidebar.error(f"Debug error: {e}")
 
 fetch_status()
 
@@ -92,77 +112,6 @@ def time_until(iso_str):
         return f"in {hours}h {minutes}m"
     except:
         return "unknown"
-
-# ─────────────────────────────────────────────
-# Sidebar
-with st.sidebar:
-    st.subheader("Account Status")
-    limits = TIERS.get(tier, TIERS['free'])
-    st.metric("Plan", tier.title())
-
-    if not st.session_state.premium:
-        with st.expander("🔑 Activate Premium"):
-            license_key = st.text_input("Enter License Key")
-            if st.button("Activate Premium"):
-                if not license_key:
-                    st.warning("Please enter a license key")
-                else:
-                    try:
-                        resp = requests.post(
-                            f"{API_URL}/activate",
-                            json={"key": license_key},
-                            headers={"X-API-Key": API_KEY}
-                        )
-                        if resp.status_code == 200:
-                            data = resp.json()
-                            if data.get("success"):
-                                st.session_state.premium = True
-                                st.session_state.premium_tier = data["tier"]
-                                st.success(f"✅ Premium {data['tier'].title()} Activated!")
-                                st.balloons()
-                                time.sleep(1)
-                                fetch_status()
-                            else:
-                                st.error(f"❌ Activation failed: {data.get('error', 'Unknown error')}")
-                        else:
-                            st.error(f"❌ Activation failed ({resp.status_code}): {resp.text[:200]}")
-                    except Exception as e:
-                        st.error(f"🚨 Connection error: {str(e)}")
-    else:
-        if st.button("Deactivate Premium"):
-            st.session_state.premium = False
-            st.session_state.premium_tier = "free"
-            st.success("✅ Premium Deactivated")
-    if st.button("🧹 Clear Previous Results"):
-        st.session_state.last_results = []
-        st.success("Previous results cleared.")
-    st.divider()
-    st.metric("🔍 Daily Searches", f"{st.session_state.usage.get('daily', 0)}/{limits['daily']}")
-    st.metric("🗓️ Monthly Searches", f"{st.session_state.usage.get('monthly', 0)}/{limits['monthly']}")
-
-    if reset:
-        if "daily" in reset:
-            st.caption(f"🔁 Daily resets {time_until(reset['daily'])}")
-        if "monthly" in reset:
-            st.caption(f"📅 Monthly resets {time_until(reset['monthly'])}")
-
-    # Better usage display in sidebar
-    usage_daily = st.session_state.usage.get('daily', 0)
-    usage_monthly = st.session_state.usage.get('monthly', 0)
-    
-    # Progress bars for usage
-    daily_progress = min(usage_daily / limits['daily'], 1.0) if limits['daily'] != float('inf') else 0
-    monthly_progress = min(usage_monthly / limits['monthly'], 1.0) if limits['monthly'] != float('inf') else 0
-    
-    st.progress(daily_progress, text=f"Daily: {usage_daily}/{limits['daily']}")
-    st.progress(monthly_progress, text=f"Monthly: {usage_monthly}/{limits['monthly']}")
-    
-    # Warning when approaching limits
-    if not st.session_state.premium:
-        if daily_progress > 0.8:
-            st.warning("⚠️ Approaching daily limit!")
-        elif monthly_progress > 0.8:
-            st.warning("⚠️ Approaching monthly limit!")
 
 # ─────────────────────────────────────────────
 # Tabs
@@ -348,3 +297,182 @@ def validate_config():
         st.stop()
 
 validate_config()
+
+# Enhanced sidebar with session management
+with st.sidebar:
+    st.subheader("📊 Account Status")
+    
+    # Status indicator
+    if st.session_state.premium:
+        st.success(f"✅ {tier.title()} Plan Active")
+    else:
+        st.info("💫 Free Plan")
+    
+    # Usage metrics (existing code remains the same)
+    usage_daily = st.session_state.usage.get('daily', 0)
+    usage_monthly = st.session_state.usage.get('monthly', 0)
+    limits = TIERS.get(tier, TIERS['free'])
+    
+    # Daily usage
+    daily_percentage = min(usage_daily / limits['daily'], 1.0) if limits['daily'] != float('inf') else 0
+    st.metric(
+        "🔍 Daily Searches", 
+        f"{usage_daily}/{limits['daily'] if limits['daily'] != float('inf') else '∞'}",
+        delta=f"{daily_percentage:.0%} used"
+    )
+    if limits['daily'] != float('inf'):
+        st.progress(daily_percentage)
+    
+    # Monthly usage
+    monthly_percentage = min(usage_monthly / limits['monthly'], 1.0) if limits['monthly'] != float('inf') else 0
+    st.metric(
+        "🗓️ Monthly Searches", 
+        f"{usage_monthly}/{limits['monthly'] if limits['monthly'] != float('inf') else '∞'}",
+        delta=f"{monthly_percentage:.0%} used"
+    )
+    if limits['monthly'] != float('inf'):
+        st.progress(monthly_percentage)
+    
+    # Reset times
+    if st.session_state.get("reset"):
+        reset = st.session_state.reset
+        if "daily" in reset:
+            st.caption(f"🔁 Daily resets {time_until(reset['daily'])}")
+        if "monthly" in reset:
+            st.caption(f"📅 Monthly resets {time_until(reset['monthly'])}")
+    
+    st.divider()
+    
+    # Session management
+    if not st.session_state.premium:
+        # Login section for premium users
+        with st.expander("🔑 Premium Login"):
+            st.info("Already have a premium subscription? Login here!")
+            premium_key = st.text_input("Premium API Key", type="password", help="Enter your premium API key")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🚀 Login", type="primary"):
+                    if not premium_key:
+                        st.warning("Please enter your premium API key")
+                    else:
+                        try:
+                            resp = requests.post(
+                                f"{API_URL}/login",
+                                json={"premium_key": premium_key},
+                                headers={"X-API-Key": API_KEY}
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                if data.get("success"):
+                                    st.session_state.premium = True
+                                    st.session_state.premium_tier = data["tier"]
+                                    st.success(f"✅ Logged in as {data['tier'].title()}!")
+                                    st.balloons()
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ Login failed: {data.get('error', 'Unknown error')}")
+                            else:
+                                try:
+                                    error_data = resp.json()
+                                    error_msg = error_data.get('error', 'Unknown error')
+                                except:
+                                    error_msg = resp.text[:200]
+                                st.error(f"❌ Login failed ({resp.status_code}): {error_msg}")
+                        except Exception as e:
+                            st.error(f"🚨 Connection error: {str(e)}")
+            
+            with col2:
+                st.markdown("**Need Premium?**")
+                if st.button("💎 Activate New"):
+                    st.session_state.show_activation = True
+        
+        # License activation (only show if clicked or no premium)
+        if st.session_state.get("show_activation", False) or not st.session_state.get("premium_key_available", True):
+            with st.expander("🎫 Activate New License", expanded=st.session_state.get("show_activation", False)):
+                st.warning("⚠️ **New Subscription**: This will create a new premium API key tied to your current app API key.")
+                license_key = st.text_input("License Key")
+                if st.button("Activate License"):
+                    if not license_key:
+                        st.warning("Please enter a license key")
+                    else:
+                        try:
+                            resp = requests.post(
+                                f"{API_URL}/activate",
+                                json={"key": license_key},
+                                headers={"X-API-Key": API_KEY}
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                if data.get("success"):
+                                    st.success(f"✅ Premium {data['tier'].title()} Activated!")
+                                    st.info(f"🔑 **Your Premium API Key:** `{data['api_key']}`")
+                                    st.warning("⚠️ **IMPORTANT**: Save this API key! Use it to login on any device.")
+                                    
+                                    # Auto-login with new key
+                                    login_resp = requests.post(
+                                        f"{API_URL}/login",
+                                        json={"premium_key": data['api_key']},
+                                        headers={"X-API-Key": API_KEY}
+                                    )
+                                    if login_resp.ok:
+                                        st.session_state.premium = True
+                                        st.session_state.premium_tier = data["tier"]
+                                        st.session_state.show_activation = False
+                                        st.balloons()
+                                        time.sleep(3)
+                                        st.rerun()
+                                else:
+                                    st.error(f"❌ Activation failed: {data.get('error', 'Unknown error')}")
+                            else:
+                                try:
+                                    error_data = resp.json()
+                                    error_msg = error_data.get('error', 'Unknown error')
+                                except:
+                                    error_msg = resp.text[:200]
+                                st.error(f"❌ Activation failed ({resp.status_code}): {error_msg}")
+                        except Exception as e:
+                            st.error(f"🚨 Connection error: {str(e)}")
+    else:
+        # Premium session management
+        with st.expander("🔑 Premium Session"):
+            st.success(f"✅ Logged in as {tier.title()}")
+            
+            # Session info
+            if st.session_state.get("reset", {}).get("monthly"):
+                reset_date = st.session_state.reset["monthly"]
+                st.metric("Session Active", "Yes")
+                st.caption(f"Subscription resets {time_until(reset_date)}")
+            
+            st.divider()
+            
+            # Logout button
+            if st.button("🚪 Logout", type="secondary", help="End premium session (you can login again anytime)"):
+                try:
+                    resp = requests.post(
+                        f"{API_URL}/logout",
+                        headers={"X-API-Key": API_KEY}
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("success"):
+                            st.session_state.premium = False
+                            st.session_state.premium_tier = "free"
+                            st.success("✅ Logged out successfully")
+                            st.info("💡 You can login again anytime with your premium API key")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error(f"❌ Logout failed: {data.get('error', 'Unknown error')}")
+                    else:
+                        try:
+                            error_data = resp.json()
+                            error_msg = error_data.get('error', 'Unknown error')
+                        except:
+                            error_msg = resp.text[:200]
+                        st.error(f"❌ Logout failed ({resp.status_code}): {error_msg}")
+                except Exception as e:
+                    st.error(f"🚨 Connection error: {str(e)}")
+    
+
