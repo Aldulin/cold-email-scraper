@@ -147,11 +147,13 @@ with tab1:
                         st.stop()
 
                     st.session_state.usage = data.get("usage", st.session_state.usage)
-                    df = pd.DataFrame(data.get("results", []))
+                    results = data.get("results", [])
 
-                    if df.empty:
+                    if not results:
                         st.info("No leads found.")
                     else:
+                        st.write("✅ Found leads:", results)
+                        df = pd.json_normalize(results)
                         st.download_button(
                             "📥 Download CSV",
                             df.to_csv(index=False),
