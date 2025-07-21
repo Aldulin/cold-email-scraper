@@ -82,7 +82,11 @@ with st.sidebar:
                             st.error(f"❌ Activation failed ({resp.status_code}): {resp.text[:200]}")
                     except Exception as e:
                         st.error(f"🚨 Connection error: {str(e)}")
-
+    else:
+        if st.button("Deactivate Premium"):
+            st.session_state.premium = False
+            st.session_state.premium_tier = "free"
+            st.success("✅ Premium Deactivated")
     st.divider()
     st.metric("🔍 Daily Searches", f"{st.session_state.usage['daily']}/{limits['daily']}")
     st.metric("🗓️ Monthly Searches", f"{st.session_state.usage['monthly']}/{limits['monthly']}")
