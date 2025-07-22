@@ -5,6 +5,32 @@ import os
 from datetime import datetime, timezone
 import time
 
+def get_client_ip():
+    """Get the real client IP from various sources"""
+    # Try to get IP from Streamlit's session info
+    try:
+        # This gets the user's real IP when possible
+        ctx = st.runtime.scriptrunner.get_script_run_ctx()
+        if ctx and hasattr(ctx, 'session_info') and hasattr(ctx.session_info, 'client'):
+            return ctx.session_info.client.request.remote_ip
+    except:
+        pass
+    
+    # Fallback: try to detect from a public IP service
+    try:
+        response = requests.get('https://api.ipify.org?format=json', timeout=3)
+        if response.ok:
+            return response.json().get('ip')
+    except:
+        pass
+    
+    # Final fallback
+    return "unknown"
+
+# Get the real client IP once
+if "client_ip" not in st.session_state:
+    st.session_state.client_ip = get_client_ip()
+
 # ─────────────────────────────────────────────
 # Config
 API_URL = "https://cold-email-scraper.fly.dev"
@@ -42,7 +68,11 @@ if "search_history" not in st.session_state:
 def fetch_status():
     try:
         with st.spinner("Checking account status..."):
-            r = requests.get(f"{API_URL}/status", headers={"X-API-Key": API_KEY}, timeout=10)
+            headers = {
+                "X-API-Key": API_KEY,
+                "X-Real-Client-IP": st.session_state.client_ip  # Add this line
+            }
+            r = requests.get(f"{API_URL}/status", headers=headers, timeout=10)
             if r.ok:
                 data = r.json()
                 tier = data.get("tier", "free")
@@ -142,7 +172,10 @@ with st.sidebar:
                     resp = requests.post(
                         f"{API_URL}/activate",
                         json={"key": license_key},
-                        headers={"X-API-Key": API_KEY}
+                        headers={
+                            "X-API-Key": API_KEY,
+                            "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                        }
                     )
                     if resp.status_code == 200:
                         data = resp.json()
@@ -176,7 +209,10 @@ with st.sidebar:
                 try:
                     resp = requests.post(
                         f"{API_URL}/logout",
-                        headers={"X-API-Key": API_KEY}
+                        headers={
+                            "X-API-Key": API_KEY,
+                            "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                        }
                     )
                     if resp.status_code == 200:
                         data = resp.json()
@@ -212,7 +248,10 @@ with st.sidebar:
                             resp = requests.post(
                                 f"{API_URL}/login",
                                 json={"premium_key": premium_key},
-                                headers={"X-API-Key": API_KEY}
+                                headers={
+                                    "X-API-Key": API_KEY,
+                                    "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                                }
                             )
                             if resp.status_code == 200:
                                 data = resp.json()
@@ -321,9 +360,18 @@ with st.sidebar:
 with st.expander("🔍 Debug Info", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
+        st.write("**Detected Client IP:**")
+        st.code(st.session_state.client_ip)
+        
         if st.button("Check IP Status"):
             try:
-                resp = requests.get(f"{API_URL}/debug/ip", headers={"X-API-Key": API_KEY})
+                resp = requests.get(
+                    f"{API_URL}/debug/ip", 
+                    headers={
+                        "X-API-Key": API_KEY,
+                        "X-Real-Client-IP": st.session_state.client_ip
+                    }
+                )
                 if resp.ok:
                     debug_data = resp.json()
                     st.json(debug_data)
@@ -338,6 +386,11 @@ with st.expander("🔍 Debug Info", expanded=False):
         st.write(f"Premium: {st.session_state.premium}")
         st.write(f"Tier: {st.session_state.premium_tier}")
         st.write(f"Usage: {st.session_state.usage}")
+        
+        if st.button("Refresh IP"):
+            st.session_state.client_ip = get_client_ip()
+            st.success(f"IP refreshed: {st.session_state.client_ip}")
+            st.rerun()
 
 # ─────────────────────────────────────────────
 # Tabs
@@ -376,7 +429,8 @@ with tab1:
                 try:
                     headers = {
                         "X-API-Key": API_KEY,
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "X-Real-Client-IP": st.session_state.client_ip  # Add this
                     }
                     resp = requests.post(
                         f"{API_URL}/scrape",
