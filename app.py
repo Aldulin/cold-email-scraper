@@ -8,10 +8,11 @@ import time
 # ─────────────────────────────────────────────
 # Config
 API_URL = "https://cold-email-scraper.fly.dev"
-API_KEY = os.getenv("API_KEY", "")
+API_KEY = os.getenv("API_KEY", "MjqbNu3Nbwu8KnHzbEbLIE7T23KETZOMbhID-dQ3Vk4")  # Add fallback
 if not API_KEY:
     st.error("API_KEY not configured")
-    st.stop()
+    st.info("Using fallback API key for testing")
+    API_KEY = "MjqbNu3Nbwu8KnHzbEbLIE7T23KETZOMbhID-dQ3Vk4"
 
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
@@ -316,6 +317,29 @@ with st.sidebar:
         st.rerun()
 
 # ─────────────────────────────────────────────
+# Debug Info (temporary)
+with st.expander("🔍 Debug Info", expanded=False):
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Check IP Status"):
+            try:
+                resp = requests.get(f"{API_URL}/debug/ip", headers={"X-API-Key": API_KEY})
+                if resp.ok:
+                    debug_data = resp.json()
+                    st.json(debug_data)
+                else:
+                    st.error(f"Debug failed: {resp.status_code}")
+                    st.code(resp.text)
+            except Exception as e:
+                st.error(f"Debug error: {e}")
+    
+    with col2:
+        st.write("**Current Session State:**")
+        st.write(f"Premium: {st.session_state.premium}")
+        st.write(f"Tier: {st.session_state.premium_tier}")
+        st.write(f"Usage: {st.session_state.usage}")
+
+# ─────────────────────────────────────────────
 # Tabs
 tab1, tab2 = st.tabs(["🔍 Search", "💎 Premium"])
 
@@ -486,13 +510,13 @@ with tab2:
             "Price"
         ],
         "Free": [
-            "3", "10", "✅", "CSV", "❌", "❌", "€0"
+            "3", "10", "✅", "❌" , "❌", "❌", "€0"
         ],
         "Starter": [
             "50", "300", "✅", "CSV", "✅", "❌", "€9.99/month"
         ],
         "Pro": [
-            "100", "1000", "✅", "CSV + Excel", "✅", "✅", "€24.99/month"
+            "100", "1000", "✅", "CSV", "✅", "✅", "€24.99/month"
         ],
         "Enterprise": [
             "Unlimited", "Unlimited", "✅", "All formats", "✅", "✅", "Contact us"
