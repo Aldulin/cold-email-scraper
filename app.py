@@ -5,38 +5,6 @@ import os
 from datetime import datetime, timezone
 import time
 
-# Update the get_client_ip function to be more reliable:
-
-def get_client_ip():
-    """Get the real client IP from various sources"""
-    # Primary method: get from public IP service
-    try:
-        response = requests.get('https://api.ipify.org?format=json', timeout=5)
-        if response.ok:
-            ip = response.json().get('ip')
-            if ip and not ip.startswith(('127.', '10.', '192.168.', '172.')):
-                return ip
-    except Exception as e:
-        st.warning(f"Could not detect IP via ipify: {e}")
-    
-    # Fallback: try to get IP from Streamlit's session info
-    try:
-        # This gets the user's real IP when possible
-        ctx = st.runtime.scriptrunner.get_script_run_ctx()
-        if ctx and hasattr(ctx, 'session_info') and hasattr(ctx.session_info, 'client'):
-            ip = ctx.session_info.client.request.remote_ip
-            if ip and not ip.startswith(('127.', '10.', '192.168.', '172.')):
-                return ip
-    except Exception as e:
-        pass
-    
-    # Final fallback
-    return "unknown"
-
-# Get the real client IP once
-if "client_ip" not in st.session_state:
-    st.session_state.client_ip = get_client_ip()
-
 # ─────────────────────────────────────────────
 # Config
 API_URL = "https://cold-email-scraper.fly.dev"
@@ -61,11 +29,10 @@ if "premium_tier" not in st.session_state:
     st.session_state.premium_tier = "free"
 if "premium" not in st.session_state:
     st.session_state.premium = False
-
+if "api_key" not in st.session_state:
+    st.session_state.api_key = API_KEY  # Use default API key for free tier
 if "last_results" not in st.session_state:
     st.session_state.last_results = []
-
-# Add to session state initialization
 if "search_history" not in st.session_state:
     st.session_state.search_history = []
 
@@ -74,13 +41,8 @@ if "search_history" not in st.session_state:
 def fetch_status():
     try:
         with st.spinner("Checking account status..."):
-            # Get the detected client IP
-            client_ip = st.session_state.client_ip
-            
-            # Send the IP in headers
             headers = {
-                "X-API-Key": API_KEY,
-                "X-Real-Client-IP": client_ip  # Add this header
+                "X-API-Key": st.session_state.api_key
             }
             
             r = requests.get(f"{API_URL}/status", headers=headers, timeout=10)
@@ -184,19 +146,17 @@ with st.sidebar:
                         f"{API_URL}/activate",
                         json={"key": license_key},
                         headers={
-                            "X-API-Key": API_KEY,
-                            "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                            "X-API-Key": license_key
                         }
                     )
                     if resp.status_code == 200:
                         data = resp.json()
                         if data.get("success"):
+                            # Save the premium API key
+                            st.session_state.api_key = data["api_key"]
                             st.success(f"✅ Premium {data['tier'].title()} Activated!")
                             st.info(f"🔑 **Your Premium API Key:** `{data['api_key']}`")
-                            st.warning("⚠️ **IMPORTANT**: Save this API key to login from other devices!")
-                            st.info("🌐 **Note**: Premium access is now active on this device/IP address")
-                            
-                            # The session should already be started by the activation
+                            st.warning("⚠️ **IMPORTANT**: Save this API key to use on other devices!")
                             st.session_state.premium = True
                             st.session_state.premium_tier = data["tier"]
                             st.balloons()
@@ -205,12 +165,7 @@ with st.sidebar:
                         else:
                             st.error(f"❌ Activation failed: {data.get('error', 'Invalid license key')}")
                     else:
-                        try:
-                            error_data = resp.json()
-                            error_msg = error_data.get('error', 'Unknown error')
-                        except:
-                            error_msg = "Invalid response from server"
-                        st.error(f"❌ Activation failed: {error_msg}")
+                        st.error("❌ Activation failed")
                 except Exception as e:
                     st.error(f"🚨 Connection error: {str(e)}")
     
@@ -260,13 +215,14 @@ with st.sidebar:
                                 f"{API_URL}/login",
                                 json={"premium_key": premium_key},
                                 headers={
-                                    "X-API-Key": API_KEY,
-                                    "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                                    "X-API-Key": premium_key
                                 }
                             )
                             if resp.status_code == 200:
                                 data = resp.json()
                                 if data.get("success"):
+                                    # Save the premium API key
+                                    st.session_state.api_key = premium_key
                                     st.session_state.premium = True
                                     st.session_state.premium_tier = data["tier"]
                                     st.session_state.show_login = False
@@ -367,43 +323,6 @@ with st.sidebar:
         st.rerun()
 
 # ─────────────────────────────────────────────
-# Debug Info (temporary)
-with st.expander("🔍 Debug Info", expanded=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("**Detected Client IP:**")
-        st.code(st.session_state.client_ip)
-        
-        if st.button("Check IP Status"):
-            try:
-                resp = requests.get(
-                    f"{API_URL}/debug/ip", 
-                    headers={
-                        "X-API-Key": API_KEY,
-                        "X-Real-Client-IP": st.session_state.client_ip  # Add this
-                    }
-                )
-                if resp.ok:
-                    debug_data = resp.json()
-                    st.json(debug_data)
-                else:
-                    st.error(f"Debug failed: {resp.status_code}")
-                    st.code(resp.text)
-            except Exception as e:
-                st.error(f"Debug error: {e}")
-    
-    with col2:
-        st.write("**Current Session State:**")
-        st.write(f"Premium: {st.session_state.premium}")
-        st.write(f"Tier: {st.session_state.premium_tier}")
-        st.write(f"Usage: {st.session_state.usage}")
-        
-        if st.button("Refresh IP"):
-            st.session_state.client_ip = get_client_ip()
-            st.success(f"IP refreshed: {st.session_state.client_ip}")
-            st.rerun()
-
-# ─────────────────────────────────────────────
 # Tabs
 tab1, tab2 = st.tabs(["🔍 Search", "💎 Premium"])
 
@@ -438,16 +357,14 @@ with tab1:
         else:
             with st.spinner("Searching..."):
                 try:
-                    client_ip = st.session_state.client_ip
                     headers = {
-                        "X-API-Key": API_KEY,
-                        "X-Real-Client-IP": client_ip  # Add this
+                        "X-API-Key": st.session_state.api_key
                     }
                     
                     resp = requests.post(
                         f"{API_URL}/scrape",
                         json={"keyword": keyword, "location": location, "count": count},
-                        headers=headers,  # Use the updated headers
+                        headers=headers,
                         timeout=60
                     )
                     try:
