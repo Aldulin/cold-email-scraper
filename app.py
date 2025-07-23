@@ -469,6 +469,22 @@ with tab1:
                         updated_usage = st.session_state.usage
                         st.success(f"✅ Found {len(results)} leads! Daily usage: {updated_usage.get('daily', 0)}/{limits['daily'] if limits['daily'] != float('inf') else '∞'}")
                         
+                        # Display updated usage metrics prominently
+                        with st.container():
+                            col_usage1, col_usage2 = st.columns(2)
+                            with col_usage1:
+                                st.metric(
+                                    "Updated Daily Usage", 
+                                    f"{updated_usage.get('daily', 0)}/{limits['daily'] if limits['daily'] != float('inf') else '∞'}",
+                                    delta=1 if results else 0
+                                )
+                            with col_usage2:
+                                st.metric(
+                                    "Updated Monthly Usage", 
+                                    f"{updated_usage.get('monthly', 0)}/{limits['monthly'] if limits['monthly'] != float('inf') else '∞'}",
+                                    delta=1 if results else 0
+                                )
+                        
                         df = pd.DataFrame(results)
                         
                         # Better metrics display
@@ -513,9 +529,6 @@ with tab1:
                                 "website": st.column_config.LinkColumn("Website"),
                             }
                         )
-                                                # Force UI to refresh the sidebar by triggering a rerun
-                        time.sleep(0.5)  # Brief pause to ensure state is updated
-                        st.rerun()
                 except Exception as e:
                     st.error(f"❌ Search failed: {str(e)}")
 
