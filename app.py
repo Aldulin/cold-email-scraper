@@ -425,7 +425,12 @@ with tab1:
                             st.code(resp.text)
                         st.stop()
 
+                    # Update usage from API response
                     st.session_state.usage = data.get("usage", st.session_state.usage)
+                    
+                    # Force refresh status to get updated usage counters
+                    st.session_state.status_checked = False
+                    
                     results = data.get("results", [])
                     st.session_state.last_results = results
                     
