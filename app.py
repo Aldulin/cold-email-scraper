@@ -8,11 +8,11 @@ import time
 # ─────────────────────────────────────────────
 # Config
 API_URL = "https://cold-email-scraper.fly.dev"
-API_KEY = os.getenv("API_KEY", "MjqbNu3Nbwu8KnHzbEbLIE7T23KETZOMbhID-dQ3Vk4")  # Add fallback
+API_KEY = os.getenv("API_KEY", "free_tier_default_key_12345")  # Use a clearly different key
 if not API_KEY:
     st.error("API_KEY not configured")
     st.info("Using fallback API key for testing")
-    API_KEY = "MjqbNu3Nbwu8KnHzbEbLIE7T23KETZOMbhID-dQ3Vk4"
+    API_KEY = "free_tier_default_key_12345"
 
 TIERS = {
     "free": {"daily": 3, "monthly": 10},
@@ -35,10 +35,17 @@ if "last_results" not in st.session_state:
     st.session_state.last_results = []
 if "search_history" not in st.session_state:
     st.session_state.search_history = []
+# Add explicit control flag
+if "status_checked" not in st.session_state:
+    st.session_state.status_checked = False
 
 # ─────────────────────────────────────────────
 # Fetch current premium tier
 def fetch_status():
+    # Skip if using default free API key unless explicitly requested
+    if st.session_state.api_key == API_KEY and st.session_state.status_checked:
+        return True
+        
     try:
         with st.spinner("Checking account status..."):
             headers = {
@@ -49,10 +56,16 @@ def fetch_status():
             if r.ok:
                 data = r.json()
                 tier = data.get("tier", "free")
+                
+                # Force free tier for default API key
+                if st.session_state.api_key == API_KEY:
+                    tier = "free"
+                
                 st.session_state.premium_tier = tier
                 st.session_state.premium = tier != "free"
                 st.session_state.usage = data.get("usage", {"daily": 0, "monthly": 0})
                 st.session_state.reset = data.get("reset", {})
+                st.session_state.status_checked = True
                 return True
             elif r.status_code == 401:
                 # Invalid API key - use defaults
@@ -60,6 +73,7 @@ def fetch_status():
                 st.session_state.premium = False
                 st.session_state.usage = {"daily": 0, "monthly": 0}
                 st.session_state.reset = {}
+                st.session_state.status_checked = True
                 st.warning("⚠️ API key not recognized - using free tier")
                 return False
             elif r.status_code == 404:
@@ -68,6 +82,7 @@ def fetch_status():
                 st.session_state.premium = False
                 st.session_state.usage = {"daily": 0, "monthly": 0}
                 st.session_state.reset = {}
+                st.session_state.status_checked = True
                 st.warning("⚠️ Status endpoint not available - using defaults")
                 return False
             else:
@@ -90,7 +105,9 @@ def fetch_status():
         st.error(f"❌ Unexpected error: {str(e)}")
         return False
 
-fetch_status()
+# Only fetch status if not already checked
+if not st.session_state.get("status_checked", False):
+    fetch_status()
 
 # ─────────────────────────────────────────────
 # UI Setup
@@ -343,6 +360,7 @@ with st.sidebar:
         st.session_state.reset = {}
         st.session_state.last_results = []
         st.session_state.search_history = []
+        st.session_state.status_checked = False  # Add this line
         if "show_login" in st.session_state:
             del st.session_state.show_login
         st.success("Session reset to free tier")
