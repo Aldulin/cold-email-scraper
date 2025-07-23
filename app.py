@@ -449,6 +449,10 @@ with tab1:
                     if not results:
                         st.info("🔍 No leads found for this search.")
                     else:
+                        # Show updated usage after search
+                        updated_usage = st.session_state.usage
+                        st.success(f"✅ Found {len(results)} leads! Daily usage: {updated_usage.get('daily', 0)}/{limits['daily'] if limits['daily'] != float('inf') else '∞'}")
+                        
                         df = pd.DataFrame(results)
                         
                         # Better metrics display
