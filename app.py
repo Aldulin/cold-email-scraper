@@ -176,14 +176,18 @@ with st.sidebar:
                     resp = requests.post(
                         f"{API_URL}/logout",
                         headers={
-                            "X-API-Key": API_KEY
+                            "X-API-Key": st.session_state.api_key  # Use current API key, not the fallback
                         }
                     )
                     if resp.status_code == 200:
                         data = resp.json()
                         if data.get("success"):
+                            # Reset to free tier with fallback API key
+                            st.session_state.api_key = API_KEY  # Reset to free tier API key
                             st.session_state.premium = False
                             st.session_state.premium_tier = "free"
+                            st.session_state.usage = {"daily": 0, "monthly": 0}
+                            st.session_state.reset = {}
                             st.success("✅ Premium session ended")
                             st.info("💡 Your subscription is still active - login anytime with your premium API key")
                             time.sleep(2)
@@ -194,6 +198,15 @@ with st.sidebar:
                         st.error("❌ Failed to end session")
                 except Exception as e:
                     st.error(f"🚨 Connection error: {str(e)}")
+                    # Force reset even if server call fails
+                    st.session_state.api_key = API_KEY
+                    st.session_state.premium = False
+                    st.session_state.premium_tier = "free"
+                    st.session_state.usage = {"daily": 0, "monthly": 0}
+                    st.session_state.reset = {}
+                    st.warning("Session ended locally due to connection error")
+                    time.sleep(1)
+                    st.rerun()
         else:
             # Premium login for existing users
             if st.button("🔑 Have API Key?", help="Login with existing premium API key"):
@@ -318,6 +331,21 @@ with st.sidebar:
         st.session_state.last_results = []
         st.session_state.search_history = []
         st.success("Previous results cleared")
+        time.sleep(1)
+        st.rerun()
+    
+    # Add debug reset button
+    if st.button("🔄 Reset Session", help="Force reset to free tier"):
+        st.session_state.api_key = API_KEY
+        st.session_state.premium = False
+        st.session_state.premium_tier = "free"
+        st.session_state.usage = {"daily": 0, "monthly": 0}
+        st.session_state.reset = {}
+        st.session_state.last_results = []
+        st.session_state.search_history = []
+        if "show_login" in st.session_state:
+            del st.session_state.show_login
+        st.success("Session reset to free tier")
         time.sleep(1)
         st.rerun()
 
