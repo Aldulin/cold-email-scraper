@@ -176,8 +176,7 @@ with st.sidebar:
                     resp = requests.post(
                         f"{API_URL}/logout",
                         headers={
-                            "X-API-Key": API_KEY,
-                            "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                            "X-API-Key": API_KEY
                         }
                     )
                     if resp.status_code == 200:
