@@ -38,12 +38,21 @@ if "search_history" not in st.session_state:
 # Add explicit control flag
 if "status_checked" not in st.session_state:
     st.session_state.status_checked = False
+# Add last checked API key tracking
+if "last_checked_api_key" not in st.session_state:
+    st.session_state.last_checked_api_key = ""
 
 # ─────────────────────────────────────────────
 # Fetch current premium tier
 def fetch_status():
     # Skip if using default free API key unless explicitly requested
     if st.session_state.api_key == API_KEY and st.session_state.status_checked:
+        return True
+    
+    # DON'T override existing premium status unless API key actually changed
+    if (st.session_state.premium and 
+        st.session_state.api_key != API_KEY and 
+        st.session_state.status_checked):
         return True
         
     try:
@@ -57,7 +66,7 @@ def fetch_status():
                 data = r.json()
                 tier = data.get("tier", "free")
                 
-                # Force free tier for default API key
+                # Force free tier ONLY for default API key
                 if st.session_state.api_key == API_KEY:
                     tier = "free"
                 
@@ -68,22 +77,24 @@ def fetch_status():
                 st.session_state.status_checked = True
                 return True
             elif r.status_code == 401:
-                # Invalid API key - use defaults
-                st.session_state.premium_tier = "free"
-                st.session_state.premium = False
-                st.session_state.usage = {"daily": 0, "monthly": 0}
-                st.session_state.reset = {}
-                st.session_state.status_checked = True
-                st.warning("⚠️ API key not recognized - using free tier")
+                # Invalid API key - use defaults ONLY if not already premium
+                if st.session_state.api_key == API_KEY:
+                    st.session_state.premium_tier = "free"
+                    st.session_state.premium = False
+                    st.session_state.usage = {"daily": 0, "monthly": 0}
+                    st.session_state.reset = {}
+                    st.session_state.status_checked = True
+                    st.warning("⚠️ API key not recognized - using free tier")
                 return False
             elif r.status_code == 404:
-                # Status endpoint doesn't exist - set defaults
-                st.session_state.premium_tier = "free"
-                st.session_state.premium = False
-                st.session_state.usage = {"daily": 0, "monthly": 0}
-                st.session_state.reset = {}
-                st.session_state.status_checked = True
-                st.warning("⚠️ Status endpoint not available - using defaults")
+                # Status endpoint doesn't exist - set defaults ONLY for free API key
+                if st.session_state.api_key == API_KEY:
+                    st.session_state.premium_tier = "free"
+                    st.session_state.premium = False
+                    st.session_state.usage = {"daily": 0, "monthly": 0}
+                    st.session_state.reset = {}
+                    st.session_state.status_checked = True
+                    st.warning("⚠️ Status endpoint not available - using defaults")
                 return False
             else:
                 error_detail = ""
@@ -105,9 +116,14 @@ def fetch_status():
         st.error(f"❌ Unexpected error: {str(e)}")
         return False
 
-# Only fetch status if not already checked
-if not st.session_state.get("status_checked", False):
+# Only fetch status if not already checked OR if API key changed
+current_api_key = st.session_state.get("api_key", API_KEY)
+last_checked_key = st.session_state.get("last_checked_api_key", "")
+
+if (not st.session_state.get("status_checked", False) or 
+    current_api_key != last_checked_key):
     fetch_status()
+    st.session_state.last_checked_api_key = current_api_key
 
 # ─────────────────────────────────────────────
 # UI Setup
@@ -497,7 +513,9 @@ with tab1:
                                 "website": st.column_config.LinkColumn("Website"),
                             }
                         )
-
+                                                # Force UI to refresh the sidebar by triggering a rerun
+                        time.sleep(0.5)  # Brief pause to ensure state is updated
+                        st.rerun()
                 except Exception as e:
                     st.error(f"❌ Search failed: {str(e)}")
 
