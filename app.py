@@ -5,23 +5,29 @@ import os
 from datetime import datetime, timezone
 import time
 
+# Update the get_client_ip function to be more reliable:
+
 def get_client_ip():
     """Get the real client IP from various sources"""
-    # Try to get IP from Streamlit's session info
+    # Primary method: get from public IP service
+    try:
+        response = requests.get('https://api.ipify.org?format=json', timeout=5)
+        if response.ok:
+            ip = response.json().get('ip')
+            if ip and not ip.startswith(('127.', '10.', '192.168.', '172.')):
+                return ip
+    except Exception as e:
+        st.warning(f"Could not detect IP via ipify: {e}")
+    
+    # Fallback: try to get IP from Streamlit's session info
     try:
         # This gets the user's real IP when possible
         ctx = st.runtime.scriptrunner.get_script_run_ctx()
         if ctx and hasattr(ctx, 'session_info') and hasattr(ctx.session_info, 'client'):
-            return ctx.session_info.client.request.remote_ip
-    except:
-        pass
-    
-    # Fallback: try to detect from a public IP service
-    try:
-        response = requests.get('https://api.ipify.org?format=json', timeout=3)
-        if response.ok:
-            return response.json().get('ip')
-    except:
+            ip = ctx.session_info.client.request.remote_ip
+            if ip and not ip.startswith(('127.', '10.', '192.168.', '172.')):
+                return ip
+    except Exception as e:
         pass
     
     # Final fallback
@@ -68,10 +74,15 @@ if "search_history" not in st.session_state:
 def fetch_status():
     try:
         with st.spinner("Checking account status..."):
+            # Get the detected client IP
+            client_ip = st.session_state.client_ip
+            
+            # Send the IP in headers
             headers = {
                 "X-API-Key": API_KEY,
-                "X-Real-Client-IP": st.session_state.client_ip  # Add this line
+                "X-Real-Client-IP": client_ip  # Add this header
             }
+            
             r = requests.get(f"{API_URL}/status", headers=headers, timeout=10)
             if r.ok:
                 data = r.json()
@@ -369,7 +380,7 @@ with st.expander("🔍 Debug Info", expanded=False):
                     f"{API_URL}/debug/ip", 
                     headers={
                         "X-API-Key": API_KEY,
-                        "X-Real-Client-IP": st.session_state.client_ip
+                        "X-Real-Client-IP": st.session_state.client_ip  # Add this
                     }
                 )
                 if resp.ok:
@@ -427,19 +438,16 @@ with tab1:
         else:
             with st.spinner("Searching..."):
                 try:
+                    client_ip = st.session_state.client_ip
                     headers = {
                         "X-API-Key": API_KEY,
-                        "Content-Type": "application/json",
-                        "X-Real-Client-IP": st.session_state.client_ip  # Add this
+                        "X-Real-Client-IP": client_ip  # Add this
                     }
+                    
                     resp = requests.post(
                         f"{API_URL}/scrape",
-                        json={
-                            "keyword": keyword,
-                            "location": location,
-                            "count": count
-                        },
-                        headers=headers,
+                        json={"keyword": keyword, "location": location, "count": count},
+                        headers=headers,  # Use the updated headers
                         timeout=60
                     )
                     try:
