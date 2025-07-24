@@ -18,7 +18,7 @@ TIERS = {
     "free": {"daily": 3, "monthly": 10},
     "starter": {"daily": 50, "monthly": 300},
     "pro": {"daily": 100, "monthly": 1000},
-    "enterprise": {"daily": float('inf'), "monthly": float('inf')}
+    "enterprise": {"daily": 500, "monthly": 5000}  # Updated from unlimited to reasonable limits
 }
 
 # ─────────────────────────────────────────────
@@ -175,32 +175,58 @@ with st.sidebar:
         if st.button("🚀 Activate", type="primary", disabled=not license_key):
             if license_key:
                 try:
-                    resp = requests.post(
-                        f"{API_URL}/activate",
-                        json={"key": license_key},
-                        headers={
-                            "X-API-Key": license_key
-                        }
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if data.get("success"):
-                            # Save the premium API key
-                            st.session_state.api_key = data["api_key"]
-                            st.success(f"✅ Premium {data['tier'].title()} Activated!")
-                            st.info(f"🔑 **Your Premium API Key:** `{data['api_key']}`")
-                            st.warning("⚠️ **IMPORTANT**: Save this API key to use on other devices!")
-                            st.session_state.premium = True
-                            st.session_state.premium_tier = data["tier"]
-                            st.balloons()
-                            time.sleep(2)
-                            st.rerun()
+                    with st.spinner("Validating license key..."):
+                        resp = requests.post(
+                            f"{API_URL}/activate",
+                            json={"key": license_key},
+                            headers={
+                                "X-API-Key": license_key
+                            },
+                            timeout=30  # Increased timeout for Gumroad API calls
+                        )
+                        
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            if data.get("success"):
+                                # Save the premium API key
+                                st.session_state.api_key = data["api_key"]
+                                st.success(f"✅ Premium {data['tier'].title()} Activated!")
+                                st.info(f"🔑 **Your Premium API Key:** `{data['api_key']}`")
+                                st.warning("⚠️ **IMPORTANT**: Save this API key to use on other devices!")
+                                st.session_state.premium = True
+                                st.session_state.premium_tier = data["tier"]
+                                st.session_state.status_checked = False  # Force status refresh
+                                st.balloons()
+                                time.sleep(2)
+                                st.rerun()
+                            else:
+                                error_msg = data.get('error', 'Invalid license key')
+                                st.error(f"❌ Activation failed: {error_msg}")
+                        elif resp.status_code == 400:
+                            try:
+                                error_data = resp.json()
+                                st.error(f"❌ {error_data.get('error', 'Invalid request')}")
+                            except:
+                                st.error("❌ Invalid license key format")
+                        elif resp.status_code == 503:
+                            try:
+                                error_data = resp.json()
+                                error_msg = error_data.get('error', 'Service unavailable')
+                                if "not configured" in error_msg.lower():
+                                    st.error("❌ License validation service not configured. Contact support.")
+                                else:
+                                    st.error("❌ Validation service temporarily unavailable. Please try again later.")
+                            except:
+                                st.error("❌ Validation service temporarily unavailable. Please try again later.")
                         else:
-                            st.error(f"❌ Activation failed: {data.get('error', 'Invalid license key')}")
-                    else:
-                        st.error("❌ Activation failed")
+                            st.error(f"❌ Activation failed (HTTP {resp.status_code})")
+                    
+                except requests.exceptions.Timeout:
+                    st.error("⏰ Activation timeout - please try again")
+                except requests.exceptions.ConnectionError:
+                    st.error("🔌 Connection failed - check your internet connection")
                 except Exception as e:
-                    st.error(f"🚨 Connection error: {str(e)}")
+                    st.error(f"🚨 Unexpected error: {str(e)}")
     
     with col2:
         if st.session_state.premium:
@@ -349,7 +375,7 @@ with st.sidebar:
             - Priority support
             """)
             
-            st.link_button("🛒 Purchase License", "https://gumroad.com/l/cold-email-scraper")
+            st.link_button("🛒 Purchase License", "https://silviucamb.gumroad.com/l/scraper")
     else:
         st.success(f"You have {tier.title()} plan")
         
@@ -598,7 +624,7 @@ with tab2:
             "100", "1000", "✅", "CSV", "✅", "✅", "€24.99/month"
         ],
         "Enterprise": [
-            "Unlimited", "Unlimited", "✅", "All formats", "✅", "✅", "Contact us"
+            "500", "5000", "✅", "All formats", "✅", "✅", "€49.99/month"
         ]
     }
     
@@ -619,7 +645,7 @@ with tab2:
             st.markdown("- 50 searches/day")
             st.markdown("- 300 searches/month")
             st.markdown("- Email extraction")
-            st.link_button("Buy Starter", "https://gumroad.com/l/starter", use_container_width=True)
+            st.link_button("Buy Starter", "https://silviucamb.gumroad.com/l/scraper", use_container_width=True)
     
     with cols[1]:
         with st.container():
@@ -629,18 +655,18 @@ with tab2:
             st.markdown("- 100 searches/day")
             st.markdown("- 1000 searches/month") 
             st.markdown("- Priority support")
-            st.link_button("Buy Pro", "https://gumroad.com/l/pro", use_container_width=True)
+            st.link_button("Buy Pro", "https://silviucamb.gumroad.com/l/scraper", use_container_width=True)  
     
     with cols[2]:
         with st.container():
             st.markdown("### 🥇 Enterprise")
-            st.markdown("**Custom pricing**")
+            st.markdown("**€49.99/month**")  # Updated from "Custom pricing"
             st.markdown("For large organizations")
-            st.markdown("- Unlimited searches")
-            st.markdown("- Custom integrations")
-            st.markdown("- Dedicated support")
-            st.link_button("Contact Sales", "mailto:sales@example.com", use_container_width=True)
-    
+            st.markdown("- 500 searches/day")  # Updated from "Unlimited"
+            st.markdown("- 5000 searches/month")  # Updated from "Unlimited"
+            st.markdown("- Priority support")
+            st.link_button("Buy Enterprise", "https://silviucamb.gumroad.com/l/scraper", use_container_width=True)
+
     st.divider()
     
     # How to activate
