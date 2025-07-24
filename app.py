@@ -416,6 +416,21 @@ with tab1:
         if not keyword or not location:
             st.warning("Please enter both keyword and location.")
         else:
+            # Check limits on frontend before making request
+            if not st.session_state.premium:
+                current_daily = st.session_state.usage.get('daily', 0)
+                current_monthly = st.session_state.usage.get('monthly', 0)
+                
+                if current_daily >= 3:
+                    st.error("🚫 Daily limit of 3 searches reached! Upgrade to premium for more searches.")
+                    st.info("💡 Your daily limit will reset at midnight UTC.")
+                    st.stop()
+                    
+                if current_monthly >= 10:
+                    st.error("🚫 Monthly limit of 10 searches reached! Upgrade to premium for more searches.")
+                    st.info("💡 Your monthly limit will reset next month.")
+                    st.stop()
+            
             with st.spinner("Searching..."):
                 try:
                     headers = {
