@@ -536,67 +536,75 @@ with tab1:
                 except Exception as e:
                     st.error(f"❌ Search request failed: {str(e)}")
     
-    df = pd.DataFrame(results)
+    # Initialize results from session state or empty list
+    results = st.session_state.get("last_results", [])
     
-    # Add row numbers starting from 1
-    df.insert(0, '#', range(1, len(df) + 1))
-    
-    # Reorder columns to have # first, then name, then others
-    desired_order = ['#', 'name']
-    other_columns = [col for col in df.columns if col not in desired_order]
-    df = df[desired_order + other_columns]
-    
-    # Better metrics display
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Total Leads", len(df))
-    with col2:
-        emails_found = len(df[df['email'].notna()]) if 'email' in df.columns else 0
-        st.metric("With Email", emails_found)
-    with col3:
-        phones_found = len(df[df['phone'].notna()]) if 'phone' in df.columns else 0
-        st.metric("With Phone", phones_found)
-    
-    # Download options (remove the # column from downloads)
-    col1, col2 = st.columns(2)
-    with col1:
-        # Create download DataFrame without the # column
-        download_df = df.drop('#', axis=1)
-        st.download_button(
-            "📥 Download All (CSV)",
-            download_df.to_csv(index=False),
-            file_name=f"leads_{keyword}_{location}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv"
-        )
-    with col2:
-        # Download only leads with emails
-        if emails_found > 0:
-            email_df = df[df['email'].notna()].drop('#', axis=1)  # Remove # column
+    # Only show DataFrame and metrics if we have results
+    if results:
+        df = pd.DataFrame(results)
+        
+        # Add row numbers starting from 1
+        df.insert(0, '#', range(1, len(df) + 1))
+        
+        # Reorder columns to have # first, then name, then others
+        desired_order = ['#', 'name']
+        other_columns = [col for col in df.columns if col not in desired_order]
+        df = df[desired_order + other_columns]
+        
+        # Better metrics display
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Leads", len(df))
+        with col2:
+            emails_found = len(df[df['email'].notna()]) if 'email' in df.columns else 0
+            st.metric("With Email", emails_found)
+        with col3:
+            phones_found = len(df[df['phone'].notna()]) if 'phone' in df.columns else 0
+            st.metric("With Phone", phones_found)
+        
+        # Download options (remove the # column from downloads)
+        col1, col2 = st.columns(2)
+        with col1:
+            # Create download DataFrame without the # column
+            download_df = df.drop('#', axis=1)
             st.download_button(
-                "📧 Download Email Leads Only",
-                email_df.to_csv(index=False),
-                file_name=f"email_leads_{keyword}_{location}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                "📥 Download All (CSV)",
+                download_df.to_csv(index=False),
+                file_name=f"leads_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                 mime="text/csv"
             )
-    
-    # Enhanced data display with custom column configuration
-    try:
-        st.dataframe(
-            df,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "#": st.column_config.NumberColumn("#", help="Lead number", width="small"),
-                "name": st.column_config.TextColumn("Business Name", help="Business name"),
-                "email": st.column_config.TextColumn("Email", help="Contact email"),
-                "phone": st.column_config.TextColumn("Phone", help="Contact phone"),
-                "website": st.column_config.LinkColumn("Website"),
-                "address": st.column_config.TextColumn("Address", help="Business address"),
-                "rating": st.column_config.NumberColumn("Rating", help="Business rating", format="%.1f ⭐")
-            }
-        )
-    except Exception as e:
-        st.error(f"❌ Search failed: {str(e)}")
+        with col2:
+            # Download only leads with emails
+            if emails_found > 0:
+                email_df = df[df['email'].notna()].drop('#', axis=1)  # Remove # column
+                st.download_button(
+                    "📧 Download Email Leads Only",
+                    email_df.to_csv(index=False),
+                    file_name=f"email_leads_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv"
+                )
+        
+        # Enhanced data display with custom column configuration
+        try:
+            st.dataframe(
+                df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "#": st.column_config.NumberColumn("#", help="Lead number", width="small"),
+                    "name": st.column_config.TextColumn("Business Name", help="Business name"),
+                    "email": st.column_config.TextColumn("Email", help="Contact email"),
+                    "phone": st.column_config.TextColumn("Phone", help="Contact phone"),
+                    "website": st.column_config.LinkColumn("Website"),
+                    "address": st.column_config.TextColumn("Address", help="Business address"),
+                    "rating": st.column_config.NumberColumn("Rating", help="Business rating", format="%.1f ⭐")
+                }
+            )
+        except Exception as e:
+            st.error(f"❌ Display error: {str(e)}")
+    else:
+        # Show message when no results
+        st.info("👆 Use the search form above to find leads")
 
 # ────────────── PREMIUM TAB ──────────────
 with tab2:
