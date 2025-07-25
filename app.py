@@ -41,6 +41,11 @@ if "status_checked" not in st.session_state:
 # Add last checked API key tracking
 if "last_checked_api_key" not in st.session_state:
     st.session_state.last_checked_api_key = ""
+# Add to session state setup at the top
+if "current_page" not in st.session_state:
+    st.session_state.current_page = 0
+if "results_per_page" not in st.session_state:
+    st.session_state.results_per_page = 10
 
 # ─────────────────────────────────────────────
 # Fetch current premium tier
@@ -443,7 +448,11 @@ with tab1:
         max_map = {"free": 20, "starter": 50, "pro": 100, "enterprise": 200}
         max_results = max_map.get(tier, 20)
 
-        count = st.slider("Number of Results", 5, max_results, min(max_results // 2, 10))
+        # Set sensible defaults based on tier
+        default_map = {"free": 10, "starter": 25, "pro": 50, "enterprise": 100}
+        default_value = default_map.get(tier, 10)
+        
+        count = st.slider("Number of Results", 5, max_results, default_value)
         submitted = st.form_submit_button("🚀 Find Leads")
 
     if submitted:
@@ -499,6 +508,9 @@ with tab1:
                     results = data.get("results", [])
                     st.session_state.last_results = results
                     
+                    # Reset pagination when new search is performed
+                    st.session_state.current_page = 0
+
                     # Add to search history here (after results is defined)
                     if results:
                         search_entry = {
@@ -543,15 +555,73 @@ with tab1:
     if results:
         df = pd.DataFrame(results)
         
-        # Add row numbers starting from 1
-        df.insert(0, '#', range(1, len(df) + 1))
+        # Pagination settings
+        results_per_page = st.session_state.results_per_page
+        total_results = len(df)
+        total_pages = (total_results - 1) // results_per_page + 1
+        current_page = st.session_state.current_page
         
-        # Reorder columns to have # first, then name, then others
+        # Ensure current page is valid
+        if current_page >= total_pages:
+            st.session_state.current_page = 0
+            current_page = 0
+        
+        # Calculate start and end indices for current page
+        start_idx = current_page * results_per_page
+        end_idx = min(start_idx + results_per_page, total_results)
+        
+        # Get current page data
+        page_df = df.iloc[start_idx:end_idx].copy()
+        
+        # Add row numbers (global, not per page)
+        page_df.insert(0, '#', range(start_idx + 1, end_idx + 1))
+        
+        # Reorder columns
         desired_order = ['#', 'name']
-        other_columns = [col for col in df.columns if col not in desired_order]
-        df = df[desired_order + other_columns]
+        other_columns = [col for col in page_df.columns if col not in desired_order]
+        page_df = page_df[desired_order + other_columns]
         
-        # Better metrics display
+        # Display pagination controls at the top
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+        
+        with col1:
+            if st.button("⏮️ First", disabled=current_page == 0):
+                st.session_state.current_page = 0
+                st.rerun()
+        
+        with col2:
+            if st.button("◀️ Prev", disabled=current_page == 0):
+                st.session_state.current_page = max(0, current_page - 1)
+                st.rerun()
+        
+        with col3:
+            st.markdown(f"**Page {current_page + 1} of {total_pages}** | Showing {start_idx + 1}-{end_idx} of {total_results} results")
+        
+        with col4:
+            if st.button("Next ▶️", disabled=current_page >= total_pages - 1):
+                st.session_state.current_page = min(total_pages - 1, current_page + 1)
+                st.rerun()
+        
+        with col5:
+            if st.button("Last ⏭️", disabled=current_page >= total_pages - 1):
+                st.session_state.current_page = total_pages - 1
+                st.rerun()
+        
+        # Results per page selector
+        col_settings1, col_settings2 = st.columns([1, 3])
+        with col_settings1:
+            new_per_page = st.selectbox(
+                "Results per page:", 
+                [5, 10, 20, 50], 
+                index=[5, 10, 20, 50].index(results_per_page),
+                key="results_per_page_selector"
+            )
+            if new_per_page != results_per_page:
+                st.session_state.results_per_page = new_per_page
+                st.session_state.current_page = 0  # Reset to first page
+                st.rerun()
+        
+        # Better metrics display (for ALL results, not just current page)
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total Leads", len(df))
@@ -562,11 +632,10 @@ with tab1:
             phones_found = len(df[df['phone'].notna()]) if 'phone' in df.columns else 0
             st.metric("With Phone", phones_found)
         
-        # Download options (remove the # column from downloads)
+        # Download options (for ALL results, not just current page)
         col1, col2 = st.columns(2)
         with col1:
-            # Create download DataFrame without the # column
-            download_df = df.drop('#', axis=1)
+            download_df = df.drop('#', axis=1) if '#' in df.columns else df
             st.download_button(
                 "📥 Download All (CSV)",
                 download_df.to_csv(index=False),
@@ -574,9 +643,10 @@ with tab1:
                 mime="text/csv"
             )
         with col2:
-            # Download only leads with emails
             if emails_found > 0:
-                email_df = df[df['email'].notna()].drop('#', axis=1)  # Remove # column
+                email_df = df[df['email'].notna()]
+                if '#' in email_df.columns:
+                    email_df = email_df.drop('#', axis=1)
                 st.download_button(
                     "📧 Download Email Leads Only",
                     email_df.to_csv(index=False),
@@ -584,10 +654,10 @@ with tab1:
                     mime="text/csv"
                 )
         
-        # Enhanced data display with custom column configuration
+        # Display current page data
         try:
             st.dataframe(
-                df,
+                page_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
@@ -602,6 +672,34 @@ with tab1:
             )
         except Exception as e:
             st.error(f"❌ Display error: {str(e)}")
+        
+        # Pagination controls at the bottom (repeat for convenience)
+        st.divider()
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+        
+        with col1:
+            if st.button("⏮️ First ", disabled=current_page == 0, key="first_bottom"):
+                st.session_state.current_page = 0
+                st.rerun()
+        
+        with col2:
+            if st.button("◀️ Prev ", disabled=current_page == 0, key="prev_bottom"):
+                st.session_state.current_page = max(0, current_page - 1)
+                st.rerun()
+        
+        with col3:
+            st.markdown(f"<center><b>Page {current_page + 1} of {total_pages}</b></center>", unsafe_allow_html=True)
+        
+        with col4:
+            if st.button("Next ▶️ ", disabled=current_page >= total_pages - 1, key="next_bottom"):
+                st.session_state.current_page = min(total_pages - 1, current_page + 1)
+                st.rerun()
+        
+        with col5:
+            if st.button("Last ⏭️ ", disabled=current_page >= total_pages - 1, key="last_bottom"):
+                st.session_state.current_page = total_pages - 1
+                st.rerun()
+
     else:
         # Show message when no results
         st.info("👆 Use the search form above to find leads")
