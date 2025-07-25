@@ -120,10 +120,17 @@ def fetch_status():
 current_api_key = st.session_state.get("api_key", API_KEY)
 last_checked_key = st.session_state.get("last_checked_api_key", "")
 
+# Add caching for status checks
+@st.cache_data(ttl=30)  # Cache for 30 seconds
+def fetch_status_cached(api_key):
+    return fetch_status()
+
+# Use cached version when appropriate
 if (not st.session_state.get("status_checked", False) or 
-    current_api_key != last_checked_key):
+    current_api_key != last_checked_key or
+    time.time() - st.session_state.get("last_status_check", 0) > 30):
     fetch_status()
-    st.session_state.last_checked_api_key = current_api_key
+    st.session_state.last_status_check = time.time()
 
 # ─────────────────────────────────────────────
 # UI Setup
@@ -166,8 +173,8 @@ with st.sidebar:
     
     license_key = st.text_input(
         "License Key", 
-        placeholder="Enter your purchase license key",
-        help="Use test keys: TEST_STARTER, TEST_PRO, TEST_ENTERPRISE"
+        placeholder="Enter your Gumroad license key",
+        help="Your license key will become your premium API key"
     )
     
     col1, col2 = st.columns(2)
@@ -188,11 +195,11 @@ with st.sidebar:
                         if resp.status_code == 200:
                             data = resp.json()
                             if data.get("success"):
-                                # Save the premium API key
-                                st.session_state.api_key = data["api_key"]
+                                # Save the license key as the API key
+                                st.session_state.api_key = data["api_key"]  # This is now the license key
                                 st.success(f"✅ Premium {data['tier'].title()} Activated!")
-                                st.info(f"🔑 **Your Premium API Key:** `{data['api_key']}`")
-                                st.warning("⚠️ **IMPORTANT**: Save this API key to use on other devices!")
+                                st.info(f"🔑 **Your License Key is now your API Key:** `{data['api_key']}`")
+                                st.warning("⚠️ **IMPORTANT**: Your Gumroad license key is now your premium API key. Save it to use on other devices!")
                                 st.session_state.premium = True
                                 st.session_state.premium_tier = data["tier"]
                                 st.session_state.status_checked = False  # Force status refresh
@@ -274,8 +281,9 @@ with st.sidebar:
     # Collapsible login section for existing premium users
     if st.session_state.get("show_login", False) and not st.session_state.premium:
         with st.expander("🔐 Premium Login", expanded=True):
-            st.info("Already have a premium API key? Enter it here:")
-            premium_key = st.text_input("Premium API Key", type="password")
+            st.info("Already activated? Enter your Gumroad license key here:")
+            premium_key = st.text_input("Gumroad License Key", type="password", 
+                                   help="Use the same license key you used for activation")
             
             col_login, col_cancel = st.columns(2)
             with col_login:
@@ -435,7 +443,7 @@ with tab1:
         max_map = {"free": 20, "starter": 50, "pro": 100, "enterprise": 200}
         max_results = max_map.get(tier, 20)
 
-        count = st.slider("Number of Results", 5, max_results, min(max_results, 10))
+        count = st.slider("Number of Results", 5, max_results, min(max_results // 2, 10))
         submitted = st.form_submit_button("🚀 Find Leads")
 
     if submitted:
@@ -525,53 +533,70 @@ with tab1:
                                     f"{updated_usage.get('monthly', 0)}/{limits['monthly'] if limits['monthly'] != float('inf') else '∞'}",
                                     delta=1 if results else 0
                                 )
-                        
-                        df = pd.DataFrame(results)
-                        
-                        # Better metrics display
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Total Leads", len(df))
-                        with col2:
-                            emails_found = len(df[df['email'].notna()]) if 'email' in df.columns else 0
-                            st.metric("With Email", emails_found)
-                        with col3:
-                            phones_found = len(df[df['phone'].notna()]) if 'phone' in df.columns else 0
-                            st.metric("With Phone", phones_found)
-                        
-                        # Download options
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.download_button(
-                                "📥 Download All (CSV)",
-                                df.to_csv(index=False),
-                                file_name=f"leads_{keyword}_{location}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                                mime="text/csv"
-                            )
-                        with col2:
-                            # Download only leads with emails
-                            if emails_found > 0:
-                                email_df = df[df['email'].notna()]
-                                st.download_button(
-                                    "📧 Download Email Leads Only",
-                                    email_df.to_csv(index=False),
-                                    file_name=f"email_leads_{keyword}_{location}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                                    mime="text/csv"
-                                )
-                        
-                        # Enhanced data display
-                        st.dataframe(
-                            df,
-                            use_container_width=True,
-                            hide_index=True,
-                            column_config={
-                                "email": st.column_config.TextColumn("Email", help="Contact email"),
-                                "phone": st.column_config.TextColumn("Phone", help="Contact phone"),
-                                "website": st.column_config.LinkColumn("Website"),
-                            }
-                        )
                 except Exception as e:
-                    st.error(f"❌ Search failed: {str(e)}")
+                    st.error(f"❌ Search request failed: {str(e)}")
+    
+    df = pd.DataFrame(results)
+    
+    # Add row numbers starting from 1
+    df.insert(0, '#', range(1, len(df) + 1))
+    
+    # Reorder columns to have # first, then name, then others
+    desired_order = ['#', 'name']
+    other_columns = [col for col in df.columns if col not in desired_order]
+    df = df[desired_order + other_columns]
+    
+    # Better metrics display
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Leads", len(df))
+    with col2:
+        emails_found = len(df[df['email'].notna()]) if 'email' in df.columns else 0
+        st.metric("With Email", emails_found)
+    with col3:
+        phones_found = len(df[df['phone'].notna()]) if 'phone' in df.columns else 0
+        st.metric("With Phone", phones_found)
+    
+    # Download options (remove the # column from downloads)
+    col1, col2 = st.columns(2)
+    with col1:
+        # Create download DataFrame without the # column
+        download_df = df.drop('#', axis=1)
+        st.download_button(
+            "📥 Download All (CSV)",
+            download_df.to_csv(index=False),
+            file_name=f"leads_{keyword}_{location}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv"
+        )
+    with col2:
+        # Download only leads with emails
+        if emails_found > 0:
+            email_df = df[df['email'].notna()].drop('#', axis=1)  # Remove # column
+            st.download_button(
+                "📧 Download Email Leads Only",
+                email_df.to_csv(index=False),
+                file_name=f"email_leads_{keyword}_{location}_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv"
+            )
+    
+    # Enhanced data display with custom column configuration
+    try:
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "#": st.column_config.NumberColumn("#", help="Lead number", width="small"),
+                "name": st.column_config.TextColumn("Business Name", help="Business name"),
+                "email": st.column_config.TextColumn("Email", help="Contact email"),
+                "phone": st.column_config.TextColumn("Phone", help="Contact phone"),
+                "website": st.column_config.LinkColumn("Website"),
+                "address": st.column_config.TextColumn("Address", help="Business address"),
+                "rating": st.column_config.NumberColumn("Rating", help="Business rating", format="%.1f ⭐")
+            }
+        )
+    except Exception as e:
+        st.error(f"❌ Search failed: {str(e)}")
 
 # ────────────── PREMIUM TAB ──────────────
 with tab2:
@@ -674,24 +699,24 @@ with tab2:
     
     st.markdown("""
     1. **Purchase** a license key from one of the links above
-    2. **Copy** the license key from your purchase email
+    2. **Copy** the license key from your purchase email  
     3. **Paste** it in the sidebar activation box
     4. **Click** Activate to unlock premium features
-    
-    Your premium API key will be generated and can be used on any device!
+
+    Your Gumroad license key becomes your premium API key automatically!
     """)
     
     # FAQ
     with st.expander("❓ Frequently Asked Questions"):
         st.markdown("""
         **Q: How do I get my license key?**
-        A: After purchase, you'll receive a license key via email. Use this to activate premium.
+        A: After purchase, you'll receive a license key via email.
         
         **Q: Can I use premium on multiple devices?**
-        A: Yes! Save your premium API key and use it to login on any device.
-        
+        A: Yes! Use your Gumroad license key to login on any device.
+
         **Q: What happens if I end my session?**
-        A: Your subscription remains active. You can login again anytime with your premium API key.
+        A: Your subscription remains active. You can login again anytime with your Gumroad license key.
         
         **Q: How do I cancel my subscription?**
         A: Contact support at support@example.com for cancellation requests.
