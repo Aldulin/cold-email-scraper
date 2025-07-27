@@ -480,9 +480,12 @@ with tab1:
                         "X-API-Key": st.session_state.api_key
                     }
                     
+                    # Add debug info (remove this after testing)
+                    st.write(f"🔍 Debug: Requesting {count} results for '{keyword}' in '{location}'")
+                    
                     resp = requests.post(
                         f"{API_URL}/scrape",
-                        json={"keyword": keyword, "location": location, "count": count},  # Make sure count is included
+                        json={"keyword": keyword, "location": location, "count": count},
                         headers=headers,
                         timeout=60
                     )
