@@ -482,7 +482,7 @@ with tab1:
                     
                     resp = requests.post(
                         f"{API_URL}/scrape",
-                        json={"keyword": keyword, "location": location, "count": count},
+                        json={"keyword": keyword, "location": location, "count": count},  # Make sure count is included
                         headers=headers,
                         timeout=60
                     )
