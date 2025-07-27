@@ -576,10 +576,11 @@ with tab1:
         # Add row numbers (global, not per page)
         page_df.insert(0, '#', range(start_idx + 1, end_idx + 1))
         
-        # Reorder columns
+        # Reorder columns - only include columns that actually exist
         desired_order = ['#', 'name']
+        available_desired = [col for col in desired_order if col in page_df.columns]
         other_columns = [col for col in page_df.columns if col not in desired_order]
-        page_df = page_df[desired_order + other_columns]
+        page_df = page_df[available_desired + other_columns]
         
         # Display pagination controls at the top
         col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
