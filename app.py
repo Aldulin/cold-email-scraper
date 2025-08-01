@@ -487,7 +487,7 @@ with tab1:
                         f"{API_URL}/scrape",
                         json={"keyword": keyword, "location": location, "count": count},
                         headers=headers,
-                        timeout=60
+                        timeout=120  # Increased from 60 to 120 seconds
                     )
                     
                     # Add this debug info after getting the response
