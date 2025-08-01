@@ -489,8 +489,22 @@ with tab1:
                         headers=headers,
                         timeout=60
                     )
+                    
+                    # Add this debug info after getting the response
                     try:
                         data = resp.json()
+                        results = data.get("results", [])
+                        st.write(f"🔍 Debug: API returned {len(results)} results (requested {count})")
+                        
+                        # Show the API response data for debugging
+                        with st.expander("API Response Debug"):
+                            st.json({
+                                "requested": data.get("requested"),
+                                "returned": data.get("returned"),
+                                "message": data.get("message"),
+                                "usage": data.get("usage")
+                            })
+                            
                     except Exception:
                         st.error("❌ Invalid JSON response from server.")
                         st.stop()
